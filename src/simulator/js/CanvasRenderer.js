@@ -270,6 +270,23 @@ class CanvasRenderer {
   }
 
   /**
+   * Draw a Bezier curve.
+   * @param {Curve} c
+   * @param {number[]} [color=[0, 0, 0, 1]]
+   */
+  drawCurve(c, color = [0, 0, 0, 1]) {
+    this.ctx.strokeStyle = this.rgbaToCssColor(color);
+    this.ctx.lineWidth = 1 * this.lengthScale;
+    this.ctx.fillStyle = this.rgbaToCssColor(color);
+
+    // Draw the curve
+    this.ctx.beginPath();
+    this.ctx.moveTo(c.p1.x, c.p1.y);
+    this.ctx.bezierCurveTo(c.c1.x, c.c1.y, c.c2.x, c.c2.y, c.p2.x, c.p2.y);
+    this.ctx.stroke();
+  }
+
+  /**
    * Draw a circle.
    * @param {Circle} c
    * @param {String} [color='black']
