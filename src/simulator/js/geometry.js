@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import Snap from "snapsvg";
+
 /**
  * @typedef {Object} Point
  * @property {number} x
@@ -30,6 +32,14 @@
  * @typedef {Object} Circle
  * @property {Point} c
  * @property {number|Line} r
+ */
+
+/**
+ * @typedef {Object} Curve
+ * @property {Point} p1
+ * @property {Point} p2
+ * @property {Point} c1
+ * @property {Point} c2
  */
 
 /**
@@ -69,6 +79,15 @@ const geometry = {
       return { c: c, r: r }
     }
   },
+
+  /**
+   * Create a (Cubic Bezier) curve
+   * @param {Point} p1 - The start point of the curve.
+   * @param {Point} p2 - The end point of the curve.
+   * @param {Point} c1 - The first control point of the curve.
+   * @param {Point} c2 - The second control point of the curve.
+   */
+  curve: function (p1, p2, c1, c2) { return { p1: p1, p2: p2, c1: c1, c2: c2 } },
 
   /**
   * Calculate the dot product, where the two points are treated as vectors.
