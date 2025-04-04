@@ -174,6 +174,13 @@ const obj_update = {
   },
   "cropbox": {
     "type": "CropBox"
+  },
+
+  "grin_curvelens": {
+    "type": "CurveGrinGlass",
+    "p_tex": "refIndexFn",
+    "step_size": "stepSize",
+    "eps": "intersectTol"
   }
 }
 
