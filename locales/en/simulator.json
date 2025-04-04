@@ -205,6 +205,12 @@
         "functions": "This numerical tolerance is used in the functions 'isOnBoundary' and 'countIntersections', inside the 'GrinGlass.js' file."
       }
     },
+    "CurveGrinGlass": {
+      "epsInfo": {
+        "units": "Units - [length].",
+        "functions": "This numerical tolerance is used in the functions 'isOnBoundary' and 'countIntersections', inside the 'CurveGrinGlass.js' file."
+      }
+    },
     "Aperature": {
       "diameter": "Diameter"
     },
