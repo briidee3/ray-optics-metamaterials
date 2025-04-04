@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import Snap from "snapsvg";
+//import Snap from "snapsvg";
 
 /**
  * @typedef {Object} Point
