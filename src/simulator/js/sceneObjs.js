@@ -62,3 +62,5 @@ export const Drawing = require('./sceneObjs/other/Drawing.js').default;
 export const Handle = require('./sceneObjs/special/Handle.js').default;
 export const CropBox = require('./sceneObjs/special/CropBox.js').default;
 export const ModuleObj = require('./sceneObjs/special/ModuleObj.js').default;
+
+export const CurveGrinGlass = require('./sceneObjs/glass/CurveGrinGlass.js').default;
