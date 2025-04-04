@@ -1383,6 +1383,10 @@ function initUIText() {
   setText('about', i18next.t('main:pages.about'));
   setText('github', null, i18next.t('main:pages.github'));
 
+  setText('tool_CurveGrinGlass_label', i18next.t('main:tools.CurveGrinGlass.title'), null, i18next.t('main:meta.parentheses', {main: i18next.t('main:tools.CurveGrinGlass.description'), sub: i18next.t('main:tools.common.clickInstruction')}), 'GrinGlass.svg');
+  setText('tool_CurveGrinGlass_mobile_label', i18next.t('main:tools.CurveGrinGlass.title'));
+
+
 
   document.getElementById('language').innerHTML = window.localeData[lang].name;
   document.getElementById('language_mobile').innerHTML = window.localeData[lang].name;
