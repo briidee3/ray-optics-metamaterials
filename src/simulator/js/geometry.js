@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { Bezier } from "bezier-js";
 //import Snap from "snapsvg";
 
 /**
@@ -41,6 +42,11 @@
  * @property {Point} c1
  * @property {Point} c2
  */
+
+/**
+ * Set a threshold for use in checking if point is on curve
+ */
+const ON_CURVE_THRESHOLD = 0.01;
 
 /**
  * The geometry module, which provides basic geometric figures and operations.
@@ -158,6 +164,17 @@ const geometry = {
 
 
   /**
+   * Calculate the intersection of a point and a curve.
+   * @param {Point} p1
+   * @param {Bezier} c1
+   * @return {Point}
+   */
+  pointCurveIntersection: function (p1, c1) {
+    return c1.project(p1);
+  },
+
+
+  /**
    * Test if a point on the extension of a ray is actually on the ray.
    * @param {Point} p1
    * @param {Line} r1
@@ -176,6 +193,22 @@ const geometry = {
    */
   intersectionIsOnSegment: function (p1, s1) {
     return (p1.x - s1.p1.x) * (s1.p2.x - s1.p1.x) + (p1.y - s1.p1.y) * (s1.p2.y - s1.p1.y) >= 0 && (p1.x - s1.p2.x) * (s1.p1.x - s1.p2.x) + (p1.y - s1.p2.y) * (s1.p1.y - s1.p2.y) >= 0;
+  },
+
+  /**
+   * Test if a point on the extension of a curve is actually on the curve.
+   * @param {Point} p1
+   * @param {Bezier} curve
+   * @return {Boolean}
+   */
+  intersectionIsOnCurve: function (p1, curve) {
+    var bbox = curve.bbox();
+    // First check if within bounding box before going further in calculations (to only calculate when necessary)
+    if (p1.x <= bbox.x.max && p1.x >= bbox.x.min && p1.y <= bbox.y.max && p1.y >= bbox.y.min) {
+      return geometry.distance(curve.project(p1), p1) <= ON_CURVE_THRESHOLD;
+    } else {
+      return false;
+    }
   },
 
   /**
