@@ -14,9 +14,11 @@
  */
 
 import BaseGrinGlass from '../BaseGrinGlass.js';
+import CurveObjMixin from '../CurveObjMixin.js';
 import i18next from 'i18next';
 import Simulator from '../../Simulator.js';
 import geometry from '../../geometry.js';
+import Bezier from 'bezier-js';
 //import Snap from 'snapsvg';
 
 /**
@@ -26,6 +28,8 @@ import geometry from '../../geometry.js';
  * @class
  * @extends BaseGrinGlass
  * @memberof sceneObjs
+ * @property// {Array<Point>} points - The points which make up a cubic Bezier curve.
+ * @property// {Bezier} curve - The Bezier curve which represents the border of the glass
  * @property {Array<Point>} path - The path which makes up the glass. Each point will be considered the (beginning or) endpoint of a cubic Bezier curve.
  * @property {Array<Point>} controlPoints - Control points for controlling the curvature of each curve.
  * @property {boolean} notDone - Whether the user is still drawing the glass.
@@ -35,11 +39,13 @@ import geometry from '../../geometry.js';
  * @property {number} stepSize - The step size for the ray trajectory equation
  * @property {number} intersectTol - The epsilon for the intersection calculations ("intersect tolerance"?)
  */
-class CurveGrinGlass extends BaseGrinGlass {
+class CurveGrinGlass extends CurveObjMixin(BaseGrinGlass) {
     static type = 'CurveGrinGlass';
     static isOptical = true;
     static supportsSurfaceMerging = true;
     static serializableDefaults = {
+        //points: [],
+        //curve: new Bezier(),
         path: [],
         controlPoints: [],
         notDone: false,
@@ -75,9 +81,9 @@ class CurveGrinGlass extends BaseGrinGlass {
             /*for (var i = 0; i < this.path.length - 1; i++) {
                 ctx.bezierCurveTo(this.controlPoints[i].x, this.controlPoints[i].y, this.controlPoints[(i + 1)].x, this.controlPoints[(i + 1)].y, this.path[(i + 1)].x, this.path[(i + 1)].y);
             }*/
-            for (var i = 0; i < this.path.length - 2; i += 2) {
+            for (var i = 0; i < this.path.length - 3; i += 2) {
                 ctx.bezierCurveTo(this.controlPoints[i].x, this.controlPoints[i].y, this.controlPoints[(i + 1)].x, this.controlPoints[(i + 1)].y, this.path[(i + 1)].x, this.path[(i + 1)].y);
-                ctx.moveTo(this.path[(i + 2)].x, this.path[(i + 2)].y);     // Go to the next starting point
+                //ctx.moveTo(this.path[(i + 2)].x, this.path[(i + 2)].y);     // Go to the next starting point
             }
             ctx.globalAlpha = 1;
             ctx.strokeStyle = 'rgb(200,200,200)';
@@ -93,7 +99,7 @@ class CurveGrinGlass extends BaseGrinGlass {
                 throw new Error("Invalid number of control points relative to number of path points.");
             }
             
-            for (var i = 0; i < this.path.length; i += 2) {
+            for (var i = 0; i < this.path.length-1; i += 2) {
                 // The weird formatting below just makes it so that we can wrap around to the beginning of the array more easily for closing of the curve.
                 ctx.bezierCurveTo(this.controlPoints[i].x, this.controlPoints[i].y, this.controlPoints[(i + 1) % this.controlPoints.length].x, this.controlPoints[(i + 1) % this.controlPoints.length].y, this.path[(i + 1) % this.path.length].x, this.path[(i + 1) % this.path.length].y);
                 ctx.moveTo(this.path[(i + 2) % this.path.length].x, this.path[(i + 2) % this.path.length].y);     // Go to the next starting point
@@ -142,6 +148,7 @@ class CurveGrinGlass extends BaseGrinGlass {
             // Initialize construction stage
             this.notDone = true;
             this.path = [{ x: mousePos.x, y: mousePos.y }];
+            this.controlPoints = [{ x: mousePos.x, y: mousePos.y }, { x: mousePos.x, y: mousePos.y }]
         }
         
         // Check if is end point of line
@@ -156,7 +163,7 @@ class CurveGrinGlass extends BaseGrinGlass {
         }
 
         // Create a new point on the path
-        this.path.push({ x: mousePos.x, y: mousePos.y });
+        //this.path.push({ x: mousePos.x, y: mousePos.y });
 
         // Check if current point is closing the lens
         /**
