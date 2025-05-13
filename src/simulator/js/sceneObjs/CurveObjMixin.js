@@ -66,14 +66,14 @@ const CurveObjMixin = Base => class extends Base {
     }
 
     onConstructMouseUp(mouse, ctrl, shift) {
-        if (!this.constructionPoint) {
+        /*if (!this.constructionPoint) {
             // Initialize the construction stage.
             this.constructionPoint = mouse.getPosSnappedToGrid();
             this.p1 = this.constructionPoint;
             this.p2 = this.constructionPoint;
             this.c1 = this.constructionPoint;
             this.c2 = this.constructionPoint;
-        }
+        }*/
         // Set control points to be in between both anchor points
         this.c1 = geometry.midpoint(this.p1, this.p2);
         this.c2 = this.c1;
@@ -158,18 +158,18 @@ const CurveObjMixin = Base => class extends Base {
 
             var mouseDiffX = dragContext.mousePos1.x - mousePos.x;  // X diff between mouse pos now and at prev moment
             var mouseDiffY = dragContext.mousePos1.y - mousePos.y;  // Y diff between mouse pos now and at prev moment
-            // Move first point
-            this.p1.x -= mouseDiffX;
-            this.p1.y -= mouseDiffY;
-            // Move second point
-            this.p2.x -= mouseDiffX;
-            this.p2.y -= mouseDiffY;
             // Move first control point
             this.c1.x -= mouseDiffX;
             this.c1.y -= mouseDiffY;
             // Move second control point
             this.c2.x -= mouseDiffX;
             this.c2.y -= mouseDiffY;
+            // Move first point
+            this.p1.x -= mouseDiffX;
+            this.p1.y -= mouseDiffY;
+            // Move second point
+            this.p2.x -= mouseDiffX;
+            this.p2.y -= mouseDiffY;
             // Move the curve
             this.curve.points = [ this.p1, this.p2, this.c1, this.c2 ];
             this.curve.update();
