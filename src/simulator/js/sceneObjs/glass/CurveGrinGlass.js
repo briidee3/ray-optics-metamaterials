@@ -107,6 +107,7 @@ class CurveGrinGlass extends BaseGrinGlass {
       this.path[i].x += diffX;
       this.path[i].y += diffY;
     }
+    this.generatePolyBezier();
   }
 
   onConstructMouseDown(mouse, ctrl, shift) {
@@ -308,6 +309,7 @@ class CurveGrinGlass extends BaseGrinGlass {
   }
   
   isOnBoundary(p3) {
+    /* Old
     for (let i = 0; i < this.path.length; i++) {
       let p1 = this.path[i];
       let p2 = this.path[(i + 1) % this.path.length];
@@ -319,6 +321,17 @@ class CurveGrinGlass extends BaseGrinGlass {
         let p1_p2_squared = geometry.distanceSquared(p1, p2);
         if (p1_p2_squared - dot_p2_p3 + this.intersectTol >= 0 && dot_p2_p3 + this.intersectTol >= 0) // if the projection of the segment p1_p3 onto the segment p1_p2, is contained in the segment p1_p2
           return true;
+      }
+    }
+    return false;*/
+
+    // New (curve-oriented)
+    for (let i = 0; i < this.path.length; i++) {
+      let closestPoint = this.curves[i].project(p3);  // Get closest point on the current curve
+
+      // If the distance to the nearest point on the current curve is below the intersect tolerance threshold, p3 is on boundary
+      if (geometry.distance(p3, closestPoint) < this.intersectTol) {
+        return true;
       }
     }
     return false;
@@ -355,6 +368,23 @@ class CurveGrinGlass extends BaseGrinGlass {
     var ray_intersect_count = 0; // The intersection count (odd means from outside)
 
     for (var i = 0; i < this.path.length; i++) {
+      var intersections = this.curves[i].intersects(ray);
+      /*
+      for (var j = 0; j < intersections.length; j++) {
+        var normal = this.curves[i].normal(intersections[j]);
+      }
+      */
+      // Send out an error if number of intersections is greater than 1 for the current ray, indicating necessity of either decrease in tolerance or adjustment of lens geometry
+      if (intersections.length > 1) {
+        throw new Error(
+          "CurveGrinGlass.js: getIncidentData():\n\tMultiple intersections with ray of length " + 
+          String(geometry.length(ray)) + " with lens.\n\tConsider using a smaller ray length or adjusting your curved lens' geometry."
+        );
+      }
+      var normal = this.curves[i].normal(intersections.p1);
+      normal_x = normal.x;
+      normal_y = normal.y;
+     
       s_point_temp = null;
       nearEdge_temp = false;
       rp_temp = geometry.linesIntersection(geometry.line(ray.p1, ray.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
@@ -412,37 +442,31 @@ class CurveGrinGlass extends BaseGrinGlass {
   }
 
   // Implementation of the "crossing number algorithm" (see - https://en.wikipedia.org/wiki/Point_in_polygon)
+  // Using p3 and (0, 0), since it shouldn't make a difference what the second point is
   countIntersections(p3) {
     var cnt = 0;
     for (let i = 0; i < this.path.length; i++) {
-      let p1 = this.path[i];
-      let p2 = this.path[(i + 1) % this.path.length];
-      let y_max = Math.max(p1.y, p2.y);
-      let y_min = Math.min(p1.y, p2.y);
-      if ((y_max - p3.y - this.intersectTol > 0 && y_max - p3.y + this.intersectTol > 0) && (y_min - p3.y - this.intersectTol < 0 && y_min - p3.y + this.intersectTol < 0)) {
-        if (p1.x == p2.x && (p1.x - p3.x + this.intersectTol > 0 && p1.x - p3.x - this.intersectTol > 0)) // in case the current segment is vertical
-          cnt++;
-        else if ((p1.x + ((p3.y - p1.y) / (p2.y - p1.y)) * (p2.x - p1.x)) - p3.x - this.intersectTol > 0 && (p1.x + ((p3.y - p1.y) / (p2.y - p1.y)) * (p2.x - p1.x)) - p3.x + this.intersectTol > 0)
-          cnt++;
-      }
+      // Add the number of intersections found on the current curve from p3 to (0, 0)
+      cnt += this.curves[i].intersects(geometry.line(p3, {x: 0, y: 0})).length;
     }
     return cnt; // Returns the number of intersections between a horizontal ray (that originates from the point - p3) and the Free-shape glass object - this.
   }
 
   // Generate default control points from path (helper method)
   generateDefaultControlPoints(prev, cur, next) {
-    var line = geometry.parallelLineThroughPoint(geometry.line(prev, next), cur);
-    var nextMidpoint = geometry.segmentMidpoint(geometry.line(cur, next));
-    var prevMidpoint = geometry.segmentMidpoint(geometry.line(cur, prev));
+    //var line = geometry.parallelLineThroughPoint(geometry.line(prev, next), cur);
+    const nextMidpoint = geometry.segmentMidpoint(geometry.line(cur, next));
+    const prevMidpoint = geometry.segmentMidpoint(geometry.line(prev, cur));
 
-    var prevLine = geometry.orthoProj(geometry.line(cur, prevMidpoint), line);
-    var nextLine = geometry.orthoProj(geometry.line(cur, nextMidpoint), line);
+    const nextLine = geometry.orthoProj(geometry.line(cur, nextMidpoint), geometry.line(prev, next));
+    const prevLine = geometry.orthoProj(geometry.line(prevMidpoint, cur), geometry.line(next, prev));
 
     return [ geometry.point(cur.x + prevLine.p2.x - prevLine.p1.x, cur.y + prevLine.p2.y - prevLine.p1.y), geometry.point(cur.x + nextLine.p2.x - nextLine.p1.x, cur.y + nextLine.p2.y - nextLine.p1.y) ];
   }
 
   // Generate Poly Bezier from path
   generatePolyBezier() {
+    this.curves = [];
     // Create one curve for each line
     for (var i = 0; i < this.path.length; i++) {
       console.log((i - 1 + this.path.length) % this.path.length)
