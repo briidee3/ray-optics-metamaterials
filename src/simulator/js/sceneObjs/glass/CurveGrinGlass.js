@@ -19,6 +19,7 @@ import i18next from 'i18next';
 import Simulator from '../../Simulator.js';
 import geometry from '../../geometry.js';
 import { Bezier } from 'bezier-js';
+import CurveObjMixin from '../CurveObjMixin.js';
 
 /**
  * Gradient-index glass of the shape of a polygon
@@ -221,27 +222,52 @@ class CurveGrinGlass extends BaseGrinGlass {
     var s_lensq_temp;
     var s_point = null;
     var s_point_temp = null;
-    var rp_temp;
+    var s_point_index = -1;
+    var rp_temp = { x: Infinity, y: Infinity };
+    var rp_temp2;
+    var intersections = null;
 
     for (var i = 0; i < this.path.length; i++) {
+      //rp_temp = { x: NaN, y: NaN }; // Reset and populate rp_temp
       s_point_temp = null;
-      
-      //Line segment i->i+1
-      var rp_temp = geometry.linesIntersection(geometry.line(ray.p1, ray.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
+      intersections = this.curves[i].lineIntersects(geometry.line(geometry.point(ray.p1.x, ray.p1.y), geometry.point(ray.p2.x, ray.p2.y)));//, this.intersectTol);
+      if (intersections.length >= 1) {
+        // Go through each of them, get the intersection point closest to p1, since it comes sorted by coordinate
+        //rp_temp = this.curves[i].get(intersections[0]);
+        console.log("Intersection keys: " + Object.keys(intersections[0]));
+        console.log("Intersection: " + intersections[0]);
 
-      if (geometry.intersectionIsOnSegment(rp_temp, geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length])) && geometry.intersectionIsOnRay(rp_temp, ray) && geometry.distanceSquared(ray.p1, rp_temp) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
+        intersections.forEach((intersection) => {
+          rp_temp2 = this.curves[i].get(intersection);
+          console.log("cRI cur rp_temp2: " + rp_temp2.x + ", " + rp_temp2.y + "\n\tt: " + intersection + "\n\t" + rp_temp2);
+          if (geometry.distance(geometry.point(rp_temp2.x, rp_temp2.y), geometry.point(ray.p1.x, ray.p1.y)) < geometry.distance(geometry.point(rp_temp.x, rp_temp.y), geometry.point(ray.p1.x, ray.p1.y))) {
+            rp_temp = rp_temp2;
+          }
+        });
+        rp_temp = geometry.point(rp_temp.x, rp_temp.y);
+        console.log("cRI intersections:\n\tLength: " + intersections.length + "\n\tFirst point: " + rp_temp.x + ", " + rp_temp.y);
+      }
+      //Line segment i->i+1
+      //var rp_temp = geometry.linesIntersection(geometry.line(ray.p1, ray.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
+      if (rp_temp.x) {
+        console.log("cRI rp_temp: " + rp_temp.x + ", " + rp_temp.y);
+      }
+      // Curve i
+
+      if (geometry.intersectionIsOnCurve(rp_temp, this.curves[i], this.intersectTol) && geometry.intersectionIsOnRay(rp_temp, ray) && geometry.distanceSquared(ray.p1, rp_temp) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
         s_lensq_temp = geometry.distanceSquared(ray.p1, rp_temp);
         s_point_temp = rp_temp;
-      
       }
       if (s_point_temp) {
         if (s_lensq_temp < s_lensq) {
           s_lensq = s_lensq_temp;
           s_point = s_point_temp;
+          s_point_index = i;
         }
       }
     }
     if (s_point) {
+      this.tmp_i = s_point_index;
       return s_point;
     }
   }
@@ -255,9 +281,10 @@ class CurveGrinGlass extends BaseGrinGlass {
     }
     try {
       this.error = null;
-
+      console.log("Checking incident...");
       if ((this.isInsideGlass(ray.p1) || this.isOutsideGlass(ray.p1)) && this.isOnBoundary(incidentPoint)) // if the ray is hitting the circle from the outside, or from the inside (meaning that the point incidentPoint is on the boundary of the circle, and the point ray.p1 is inside/outside the circle)
       {
+        console.log("Is inside glass or is outside and incident point on boundary...");
         let r_bodyMerging_obj = ray.bodyMergingObj; // save the current bodyMergingObj of the ray, to pass it later to the reflected ray in the 'refract' function
 
         var incidentData = this.getIncidentData(ray);
@@ -266,22 +293,27 @@ class CurveGrinGlass extends BaseGrinGlass {
           // From inside to outside
           var n1 = this.getRefIndexAt(incidentPoint, ray);
           this.onRayExit(ray);
+          console.log("Incident type 1");
         } else if (incidentType == -1) {
           // From outside to inside
           var n1 = 1 / this.getRefIndexAt(incidentPoint, ray);
           this.onRayEnter(ray);
+          console.log("Incident type II");
         } else if (incidentType == 0) {
           // Equivalent to not intersecting with the object (e.g. two interfaces overlap)
           var n1 = 1;
+          console.log("Incident type III");
         } else {
           // The situation that may cause bugs (e.g. incident on an edge point)
           // To prevent shooting the ray to a wrong direction, absorb the ray
+          console.log("Incident type 0");
           return {
             isAbsorbed: true
           };
         }
         return this.refract(ray, rayIndex, incidentData.s_point, incidentData.normal, n1, surfaceMergingObjs, r_bodyMerging_obj);
       } else {
+        console.log("Is NOT inside glass or outside and incident point on boundary...");
         if (ray.bodyMergingObj === undefined)
           ray.bodyMergingObj = this.initRefIndex(ray); // Initialize the bodyMerging object of the ray
         const next_point = this.step(ray.p1, incidentPoint, ray);
@@ -290,6 +322,7 @@ class CurveGrinGlass extends BaseGrinGlass {
       }
     } catch (e) {
       this.error = e.toString();
+      console.log(this.error);
       return {
         isAbsorbed: true
       };
@@ -297,14 +330,17 @@ class CurveGrinGlass extends BaseGrinGlass {
   }
 
   getIncidentType(ray) {
+    console.log("incidentType(" + ray + "):\t" + this.getIncidentData(ray).indidentType);
     return this.getIncidentData(ray).incidentType;
   }
 
   isOutsideGlass(point) {
+    console.log("isOutsideGlass(" + point + "):\t" + !this.isOnBoundary(point) && this.countIntersections(point) % 2 == 0);
     return (!this.isOnBoundary(point) && this.countIntersections(point) % 2 == 0)
   }
 
   isInsideGlass(point) {
+    console.log("isInsideGlass(" + point + "):\t" + (!this.isOnBoundary(point) && this.countIntersections(point) % 2 == 1));
     return (!this.isOnBoundary(point) && this.countIntersections(point) % 2 == 1)
   }
   
@@ -327,10 +363,18 @@ class CurveGrinGlass extends BaseGrinGlass {
 
     // New (curve-oriented)
     for (let i = 0; i < this.path.length; i++) {
-      let closestPoint = this.curves[i].project(p3);  // Get closest point on the current curve
+      /*closestPoint = this.curves[i].get(this.curves[i].project(geometry.point(p3.x, p3.y)).t);
+      closestPoint = geometry.point(closestPoint.x, closestPoint.y);
+      console.log("CURVE " + i + ": Tolerance:" + this.intersectTol);
+      console.log("Closest point:\t" + closestPoint.x + ", " + closestPoint.y);
+      console.log("Point given:\t" + p3.x + ", " + p3.y);
+      console.log("Difference:\t" + (p3.x - closestPoint.x) + ", " + (p3.y - closestPoint.y));
+      console.log("Distance:\t" + geometry.distance(geometry.point(p3.x, p3.y), closestPoint));*/
+      console.log("Distance:\t" + this.curves[i].project(geometry.point(p3.x, p3.y)).d);
 
-      // If the distance to the nearest point on the current curve is below the intersect tolerance threshold, p3 is on boundary
-      if (geometry.distance(p3, closestPoint) < this.intersectTol) {
+      // If the distance to the nearest point on the current curve from p3 is below the intersect tolerance threshold, p3 is on boundary
+      if (this.curves[i].project(geometry.point(p3.x, p3.y)).d < this.intersectTol) {
+        console.log("INTERSECTION");
         return true;
       }
     }
@@ -340,6 +384,39 @@ class CurveGrinGlass extends BaseGrinGlass {
   /* Utility methods */
 
   getIncidentData(ray) {
+    var i = this.tmp_i;
+    
+    var intersections = this.curves[i].lineIntersects(geometry.line(ray.p1, ray.p2));
+    
+    var s_point = { x: Infinity, y: Infinity };
+    var s_point_tmp = s_point;
+
+    // Get normal from the curve
+    if (intersections.length >= 1) {
+      s_point = this.curves[i].get(intersections[0]);
+      
+      // Get closest intersection on curve to current point (for when there are multiple intersections on the curve)
+      intersections.forEach((intersection) => {
+        s_point_tmp = this.curves[i].get(intersection);
+        if (geometry.distance(geometry.point(s_point_tmp.x, s_point_tmp.y), geometry.point(ray.p1.x, ray.p1.y)) < geometry.distance(geometry.point(s_point.x, s_point.y), geometry.point(ray.p1.x, ray.p1.y))) {
+          s_point = s_point_tmp;
+        }
+      });
+    }
+
+    var normal = this.curves[i].normal(s_point.t);
+    normal = geometry.point(normal.x, normal.y);
+
+    if (this.isInsideGlass(ray.p1)) {
+      var incidentType = 1; // Inside to outside
+    } else {
+      var incidentType = -1; // Outside to inside
+    }
+
+    return { s_point: s_point, normal: normal, incidentType: incidentType }
+  }
+
+  getIncidentData_old(ray) {
     var s_lensq = Infinity;
     var s_lensq_temp;
     var s_point = null;
@@ -349,8 +426,8 @@ class CurveGrinGlass extends BaseGrinGlass {
     var surfaceMultiplicity = 1; // How many time the surfaces coincide
 
     var rp_temp;
-
-    var rp2_temp;
+    //var rp2_temp;
+    var rp_temp_tmp;
 
     var normal_x;
     var normal_x_temp;
@@ -364,49 +441,81 @@ class CurveGrinGlass extends BaseGrinGlass {
     var nearEdge = false;
     var nearEdge_temp = false;
 
-    var ray2 = geometry.line(ray.p1, geometry.point(ray.p2.x + this.scene.rng() * 1e-5, ray.p2.y + this.scene.rng() * 1e-5)); // The ray to test the inside/outside (the test ray)
+    //var ray2 = geometry.line(ray.p1, geometry.point(ray.p2.x + this.scene.rng() * 1e-5, ray.p2.y + this.scene.rng() * 1e-5)); // The ray to test the inside/outside (the test ray)
     var ray_intersect_count = 0; // The intersection count (odd means from outside)
 
+    var intersections = null; // Bezier intersections
+    var normal = null; // Normal using BezierJS
+
     for (var i = 0; i < this.path.length; i++) {
-      var intersections = this.curves[i].intersects(ray);
+      rp_temp = { x: NaN, y: NaN };
+      intersections = this.curves[i].intersects(geometry.line(ray.p1, ray.p2));
+      ray_intersect_count += intersections.length;
       /*
       for (var j = 0; j < intersections.length; j++) {
         var normal = this.curves[i].normal(intersections[j]);
       }
-      */
+      
       // Send out an error if number of intersections is greater than 1 for the current ray, indicating necessity of either decrease in tolerance or adjustment of lens geometry
       if (intersections.length > 1) {
         throw new Error(
           "CurveGrinGlass.js: getIncidentData():\n\tMultiple intersections with ray of length " + 
           String(geometry.length(ray)) + " with lens.\n\tConsider using a smaller ray length or adjusting your curved lens' geometry."
         );
-      }
-      var normal = this.curves[i].normal(intersections.p1);
-      normal_x = normal.x;
-      normal_y = normal.y;
+      }*/
      
+      // Get normal from the curve
+      if (intersections.length >= 1) {
+        // Get intersections of both rays with the curve in x,y coords
+        rp_temp = this.curves[i].get(intersections[0]);
+        //rp2_temp = this.curves[i].get(intersections.r2[0]);
+        //rp_temp = geometry.point(rp_temp.x, rp_temp.y);
+        //rp2_temp = geometry.point(rp2_temp.x, rp2_temp.y)
+       
+        // Get closest intersection on curve to current point (for when there are multiple intersections on the curve)
+        intersections.forEach((intersection) => {
+          rp_temp_tmp = this.curves[i].get(intersection);
+          if (geometry.distance(geometry.point(rp_temp_tmp.x, rp_temp_tmp.y), geometry.point(ray.p1.x, ray.p1.y)) < geometry.distance(geometry.point(rp_temp.x, rp_temp.y), geometry.point(ray.p1.x, ray.p1.y))) {
+            rp_temp = rp_temp_tmp;
+          }
+        });
+
+        //rp_temp = geometry.linesIntersection(geometry.line(ray.p1, ray.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
+        //rp2_temp = geometry.linesIntersection(geometry.line(ray2.p1, ray2.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
+  
+        console.log(geometry.point(rp_temp.x, rp_temp.y));
+        //console.log(rp2_temp);
+      }
+
       s_point_temp = null;
       nearEdge_temp = false;
-      rp_temp = geometry.linesIntersection(geometry.line(ray.p1, ray.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
 
-      rp2_temp = geometry.linesIntersection(geometry.line(ray2.p1, ray2.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
-      if (geometry.intersectionIsOnSegment(rp_temp, geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length])) && geometry.intersectionIsOnRay(rp_temp, ray) && geometry.distanceSquared(ray.p1, rp_temp) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
-        s_lensq_temp = geometry.distanceSquared(ray.p1, rp_temp);
-        s_point_temp = rp_temp;
+      if (geometry.intersectionIsOnCurve(geometry.point(rp_temp.x, rp_temp.y), this.curves[i], this.intersectTol) && geometry.intersectionIsOnRay(geometry.point(rp_temp.x, rp_temp.y), ray) && geometry.distanceSquared(ray.p1, geometry.point(rp_temp.x, rp_temp.y)) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
+        s_lensq_temp = geometry.distanceSquared(ray.p1, geometry.point(rp_temp.x, rp_temp.y)); // Distance between first point of ray and point of intersection
+        s_point_temp = geometry.point(rp_temp.x, rp_temp.y);
 
+        /*
         rdots = (ray.p2.x - ray.p1.x) * (this.path[(i + 1) % this.path.length].x - this.path[i % this.path.length].x) + (ray.p2.y - ray.p1.y) * (this.path[(i + 1) % this.path.length].y - this.path[i % this.path.length].y);
         ssq = (this.path[(i + 1) % this.path.length].x - this.path[i % this.path.length].x) * (this.path[(i + 1) % this.path.length].x - this.path[i % this.path.length].x) + (this.path[(i + 1) % this.path.length].y - this.path[i % this.path.length].y) * (this.path[(i + 1) % this.path.length].y - this.path[i % this.path.length].y);
 
         normal_x_temp = rdots * (this.path[(i + 1) % this.path.length].x - this.path[i % this.path.length].x) - ssq * (ray.p2.x - ray.p1.x);
         normal_y_temp = rdots * (this.path[(i + 1) % this.path.length].y - this.path[i % this.path.length].y) - ssq * (ray.p2.y - ray.p1.y);
+        */
+
+        normal = this.curves[i].normal(rp_temp.t);
+
+        console.log("NORMAL: " + normal.x + ", " + normal.y);
+
+        normal_x = normal.x;
+        normal_y = normal.y;
 
       }
 
-      if (geometry.intersectionIsOnSegment(rp2_temp, geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length])) && geometry.intersectionIsOnRay(rp2_temp, ray2) && geometry.distanceSquared(ray2.p1, rp2_temp) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
+      /*if (geometry.intersectionIsOnSegment(rp2_temp, geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length])) && geometry.intersectionIsOnRay(rp2_temp, ray2) && geometry.distanceSquared(ray2.p1, rp2_temp) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
         ray_intersect_count++;
-      }
+      }*/
 
-      // Test if too close to an edge
+      // Test if too close to an edge. Can use default without accounting for curves because this tests for proximity to bounding points of the curve, not the curve itself, and those bounding points are the same as those for a straight line.
       if (s_point_temp && (geometry.distanceSquared(s_point_temp, this.path[i % this.path.length]) < Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale || geometry.distanceSquared(s_point_temp, this.path[(i + 1) % this.path.length]) < Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale)) {
         nearEdge_temp = true;
       }
@@ -430,11 +539,15 @@ class CurveGrinGlass extends BaseGrinGlass {
 
     if (nearEdge) {
       var incidentType = NaN; // Incident on an edge point
+      console.log("NEAR EDGE");
     } else if (surfaceMultiplicity % 2 == 0) {
       var incidentType = 0; // Equivalent to not intersecting with the object
+      console.log("NO INTERACTION");
     } else if (ray_intersect_count % 2 == 1) {
       var incidentType = 1; // From inside to outside
+      console.log("INSIDE OUT");
     } else {
+      console.log("OUTSIDE IN");
       var incidentType = -1; // From outside to inside
     }
 
@@ -442,12 +555,13 @@ class CurveGrinGlass extends BaseGrinGlass {
   }
 
   // Implementation of the "crossing number algorithm" (see - https://en.wikipedia.org/wiki/Point_in_polygon)
-  // Using p3 and (0, 0), since it shouldn't make a difference what the second point is
+  // Using p3 and (0, 0), since it shouldn't make a difference what the second point is for just getting even or odd to find out if in or out of object.
   countIntersections(p3) {
+    
     var cnt = 0;
     for (let i = 0; i < this.path.length; i++) {
       // Add the number of intersections found on the current curve from p3 to (0, 0)
-      cnt += this.curves[i].intersects(geometry.line(p3, {x: 0, y: 0})).length;
+      cnt += this.curves[i].intersects(geometry.line(geometry.point(p3.x, p3.y), {x: 0, y: 0})).length;// ? 1 : 0;
     }
     return cnt; // Returns the number of intersections between a horizontal ray (that originates from the point - p3) and the Free-shape glass object - this.
   }
@@ -469,8 +583,6 @@ class CurveGrinGlass extends BaseGrinGlass {
     this.curves = [];
     // Create one curve for each line
     for (var i = 0; i < this.path.length; i++) {
-      console.log((i - 1 + this.path.length) % this.path.length)
-      console.log(this.path[(i - 1 + this.path.length) % this.path.length])
       let curCtrlPts = this.generateDefaultControlPoints(this.path[(i - 1 + this.path.length) % this.path.length], this.path[i], this.path[(i + 1) % this.path.length])
       this.curves.push(new Bezier(this.path[i], curCtrlPts[0], curCtrlPts[1], this.path[(i + 1) % this.path.length]));
       //this.drawCurve(this.curves[i], this.path[i], canvasRenderer);
