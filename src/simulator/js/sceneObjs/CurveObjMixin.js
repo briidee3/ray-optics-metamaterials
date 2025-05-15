@@ -21,19 +21,19 @@ const CurveObjMixin = Base => class extends Base {
 
     move(diffX, diffY) {
         // Move the first point
-        this.p1.x = this.p1.x + diffX;
-        this.p1.y = this.p1.y + diffY;
+        this.p1.x += diffX;
+        this.p1.y += diffY;
         // Move the second point
-        this.p2.x = this.p2.x + diffX;
-        this.p2.y = this.p2.y + diffY;
+        this.p2.x += diffX;
+        this.p2.y += diffY;
         // Move the first control point
-        this.c1.x = this.c1.x + diffX;
-        this.c1.y = this.c1.y + diffY;
+        this.c1.x += diffX;
+        this.c1.y += diffY;
         // Move the second control point
-        this.c2.x = this.c2.x + diffX;
-        this.c2.y = this.c2.y + diffY;
+        this.c2.x += diffX;
+        this.c2.y += diffY;
         // Move the curve
-        this.curve.points = [ this.p1, this.p2, this.c1, this.c2 ];
+        this.curve.points = [ this.p1, this.c1, this.c2, this.p2 ];
         this.curve.update();
     }
     
@@ -78,7 +78,7 @@ const CurveObjMixin = Base => class extends Base {
         this.c1 = geometry.midpoint(this.p1, this.p2);
         this.c2 = this.c1;
         // Create Bezier curve object
-        this.curve = new Bezier(this.p1.x, this.p1.y, this.p2.x, this.p2.y, this.c1.x, this.c1.y, this.c2.x, this.c2.y);
+        this.curve = new Bezier(geometry.point(this.p1.x, this.p1.y), geometry.point(this.c1.x, this.c1.y), geometry.point(this.c2.x, this.c2.y), geometry.point(this.p2.x, this.p2.y));
 
         if (!mouse.snapsOnPoint(this.p1)) {
             delete this.constructionPoint;
@@ -185,10 +185,10 @@ const CurveObjMixin = Base => class extends Base {
      * @returns {Point} The intersection point, or null if there is no intersection.
      */
     checkRayIntersectsShape(ray) {
-        var rp_temp = this.curve.lineIntersects(ray);
+        var rp_temp = this.curve.lineIntersects(geometry.line(ray.p1, ray.p2));
 
-        if (geometry.intersectionIsOnCurve(rp_temp, this)) {
-            return rp_temp;
+        if (rp_temp.length >= 1) {
+            return this.curve.get(rp_temp[0]);
         } else {
             return null;
         }
