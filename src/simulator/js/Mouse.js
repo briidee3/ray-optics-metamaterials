@@ -95,7 +95,7 @@ class Mouse {
    * @returns {boolean} True if the mouse is on the given curve, false otherwise.
    */
   isOnCurve(curve) {
-    return geometry.distanceSquared(this.pos, curve.project(this.pos)) < this.getClickExtent(true) * this.getClickExtent(true);
+    return curve.project(this.pos).d < this.getClickExtent(true) * this.getClickExtent(true);
   }
 
   /**
