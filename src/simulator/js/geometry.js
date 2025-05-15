@@ -15,6 +15,7 @@
  */
 
 import { Bezier } from "bezier-js";
+//import { MIN_RAY_SEGMENT_LENGTH_SQUARED } from './Simulator.js';
 //import Snap from "snapsvg";
 
 /**
@@ -46,7 +47,7 @@ import { Bezier } from "bezier-js";
 /**
  * Set a threshold for use in checking if point is on curve
  */
-const ON_CURVE_THRESHOLD = 0.01;
+const ON_CURVE_THRESHOLD = 0.05;
 
 /**
  * The geometry module, which provides basic geometric figures and operations.
@@ -170,7 +171,7 @@ const geometry = {
    * @return {Point}
    */
   pointCurveIntersection: function (p1, c1) {
-    return c1.project(p1);
+    return c1.get(c1.project(p1).t);
   },
 
 
@@ -201,14 +202,22 @@ const geometry = {
    * @param {Bezier} curve
    * @return {Boolean}
    */
-  intersectionIsOnCurve: function (p1, curve) {
-    var bbox = curve.bbox();
+  intersectionIsOnCurve: function (p1, curve, threshold) {
+    /*var bbox = curve.bbox();
     // First check if within bounding box before going further in calculations (to only calculate when necessary)
     if (p1.x <= bbox.x.max && p1.x >= bbox.x.min && p1.y <= bbox.y.max && p1.y >= bbox.y.min) {
-      return geometry.distance(curve.project(p1), p1) <= ON_CURVE_THRESHOLD;
+      console.log("TRUE");
+      return geometry.distance(curve.project(p1), p1) <= threshold;
     } else {
       return false;
+    }*/
+    var proj = curve.get(curve.project(geometry.point(p1.x, p1.y)).t);
+    if (p1.x) {
+      console.log("IoC projection:" + proj.x + "," + proj.y);
+      console.log("IoC point:" + p1.x + "," + p1.y);
     }
+
+    return geometry.distance(geometry.point(proj.x, proj.y), p1) < threshold;
   },
 
   /**
