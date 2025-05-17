@@ -249,8 +249,8 @@ const geometry = {
     
     // Normalize v1 then scale it by dist
     var len_v1 = Math.sqrt(v1.x ** 2 + v1.y ** 2);
-    v1.x = (v1.x / len_v1) * dist;
-    v1.y = (v1.y / len_v1) * dist;
+    v1.x = (v1.x / len_v1) * dist * 1.001;
+    v1.y = (v1.y / len_v1) * dist * 1.001;
 
     return geometry.line(r1.p1, geometry.point(v1.x + r1.p1.x, v1.y + r1.p1.y));
   },
