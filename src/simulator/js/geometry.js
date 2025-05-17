@@ -203,14 +203,7 @@ const geometry = {
    * @return {Boolean}
    */
   intersectionIsOnCurve: function (p1, curve, threshold) {
-    /*var bbox = curve.bbox();
-    // First check if within bounding box before going further in calculations (to only calculate when necessary)
-    if (p1.x <= bbox.x.max && p1.x >= bbox.x.min && p1.y <= bbox.y.max && p1.y >= bbox.y.min) {
-      console.log("TRUE");
-      return geometry.distance(curve.project(p1), p1) <= threshold;
-    } else {
-      return false;
-    }*/
+    var bbox = curve.bbox();
     var proj = curve.get(curve.project(geometry.point(p1.x, p1.y)).t);
     if (p1.x) {
       console.log("IoC projection:" + proj.x + "," + proj.y);
@@ -218,6 +211,48 @@ const geometry = {
     }
 
     return geometry.distance(geometry.point(proj.x, proj.y), p1) < threshold;
+  },
+
+  /**
+   * Scale the ray based on the bounding box of the curve.
+   * @param {Line} r1
+   * @param {Bezier} curve
+   * @return {Line} - Returns the vector pointing from r1.p1 to the farthest point on the curve's bounding box.
+   */
+  scaleRayForCurve: function (r1, curve) {
+    var bbox = curve.bbox();
+
+    // Offset each line from 0,0 by r1.p1
+    bbox.x.min -= r1.p1.x;
+    bbox.x.max -= r1.p1.x;
+    bbox.y.min -= r1.p1.y;
+    bbox.y.max -= r1.p1.y;
+
+    // Get vector (as a point) pointing from r1.p1 to r1.p2
+    var v1 = geometry.point(r1.p2.x - r1.p1.x, r1.p2.y - r1.p1.y);
+
+    // Figure out which bounding box corner is farthest from r1.p1 based on what quadrant v1 is in after offsetting by p1
+    var farthest = { x: Infinity, y: Infinity };
+    if (Math.abs(bbox.x.min) > Math.abs(bbox.x.max)) {
+      farthest.x = bbox.x.min;
+    } else {
+      farthest.x = bbox.x.max;
+    }
+    if (Math.abs(bbox.y.min) > Math.abs(bbox.y.max)) {
+      farthest.y = bbox.y.min;
+    } else {
+      farthest.y = bbox.y.max;
+    }
+
+    // Get distance between p1 and farthest point
+    var dist = Math.sqrt(farthest.x ** 2 + farthest.y ** 2);
+    
+    // Normalize v1 then scale it by dist
+    var len_v1 = Math.sqrt(v1.x ** 2 + v1.y ** 2);
+    v1.x = (v1.x / len_v1) * dist;
+    v1.y = (v1.y / len_v1) * dist;
+
+    return geometry.line(r1.p1, geometry.point(v1.x + r1.p1.x, v1.y + r1.p1.y));
   },
 
   /**
