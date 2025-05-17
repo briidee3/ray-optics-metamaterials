@@ -19,7 +19,6 @@ import i18next from 'i18next';
 import Simulator from '../../Simulator.js';
 import geometry from '../../geometry.js';
 import { Bezier } from 'bezier-js';
-import CurveObjMixin from '../CurveObjMixin.js';
 
 /**
  * Gradient-index glass of the shape of a polygon
@@ -35,7 +34,7 @@ import CurveObjMixin from '../CurveObjMixin.js';
  * @property {string} refIndexFn - The refractive index function in x and y in LaTeX format.
  * @property {Point} origin - The origin of the (x,y) coordinates used in the refractive index function.
  * @property {number} stepSize - The step size for the ray trajectory equation.
- * @property {number} intersectTol - The epsilon for the intersection calculations.
+ * @property {number} intersectTol - Tolerance for intersection calculations.
  */
 class CurveGrinGlass extends BaseGrinGlass {
   static type = 'CurveGrinGlass';
@@ -43,13 +42,12 @@ class CurveGrinGlass extends BaseGrinGlass {
   static supportsSurfaceMerging = true;
   static serializableDefaults = {
     curves: [],
-    polyBezier: null,
     path: [],
     notDone: false,
     refIndexFn: '1.1+0.1\\cdot\\cos\\left(0.1\\cdot y\\right)',
     origin: { x: 0, y: 0 },
     stepSize: 1,
-    intersectTol: 1e-3
+    intersectTol: 1
   };
   
   populateObjBar(objBar) {
@@ -240,18 +238,17 @@ class CurveGrinGlass extends BaseGrinGlass {
       if (intersections.length >= 1) {
         // Go through each of them, get the intersection point closest to p1, since it comes sorted by coordinate
         //rp_temp = this.curves[i].get(intersections[0]);
-        console.log("Intersection keys: " + Object.keys(intersections[0]));
-        console.log("Intersection: " + intersections[0]);
+        //console.log("Intersection: " + intersections[0]);
 
         intersections.forEach((intersection) => {
           rp_temp2 = this.curves[i].get(intersection);
-          console.log("cRI cur rp_temp2: " + rp_temp2.x + ", " + rp_temp2.y + "\n\tt: " + intersection + "\n\t" + rp_temp2);
+          //console.log("cRI cur rp_temp2: " + rp_temp2.x + ", " + rp_temp2.y + "\n\tt: " + intersection + "\n\t" + rp_temp2);
           if (geometry.distance(geometry.point(rp_temp2.x, rp_temp2.y), scaled_ray.p1) < geometry.distance(geometry.point(rp_temp.x, rp_temp.y), scaled_ray.p1)) {
             rp_temp = rp_temp2;
             rp_temp = geometry.point(rp_temp.x, rp_temp.y);
           }
         });
-        console.log("cRI intersections:\n\tLength: " + intersections.length + "\n\tFirst point: " + rp_temp.x + ", " + rp_temp.y);
+        //console.log("cRI intersections:\n\tLength: " + intersections.length + "\n\tFirst point: " + rp_temp.x + ", " + rp_temp.y);
       
         //Line segment i->i+1
         //var rp_temp = geometry.linesIntersection(geometry.line(ray.p1, ray.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
@@ -262,9 +259,7 @@ class CurveGrinGlass extends BaseGrinGlass {
           s_lensq_temp = geometry.distanceSquared(scaled_ray.p1, rp_temp);
           s_point_temp = rp_temp;
         }
-      } else {
-        console.log("No intersections found.");
-      }
+      } 
 
       if (s_point_temp) {
         if (s_lensq_temp < s_lensq) {
@@ -289,10 +284,11 @@ class CurveGrinGlass extends BaseGrinGlass {
     }
     try {
       this.error = null;
-      console.log("Checking incident...");
+      //console.log("Checking incident...");
+      // If incidentPoint is not null, then that means that checkRayIntersects returned a non-null s_point, which can only be acquired for this object by there existing at least one intersection point. Hence we need not check if isOnBoundary, but instead whether or not incidentPoint is null.
+      //if ((this.isInsideGlass(ray.p1) || this.isOutsideGlass(ray.p1)) && this.isOnBoundary(incidentPoint)) // if the ray is hitting the circle from the outside, or from the inside (meaning that the point incidentPoint is on the boundary of the circle, and the point ray.p1 is inside/outside the circle)
       if ((this.isInsideGlass(ray.p1) || this.isOutsideGlass(ray.p1)) && this.isOnBoundary(incidentPoint)) // if the ray is hitting the circle from the outside, or from the inside (meaning that the point incidentPoint is on the boundary of the circle, and the point ray.p1 is inside/outside the circle)
       {
-        console.log("Is inside glass or is outside and incident point on boundary...");
         let r_bodyMerging_obj = ray.bodyMergingObj; // save the current bodyMergingObj of the ray, to pass it later to the reflected ray in the 'refract' function
 
         var incidentData = this.getIncidentData(ray);
@@ -301,7 +297,7 @@ class CurveGrinGlass extends BaseGrinGlass {
           // From inside to outside
           var n1 = this.getRefIndexAt(incidentPoint, ray);
           this.onRayExit(ray);
-          console.log("Incident type 1");
+          console.log("Incident type I");
         } else if (incidentType == -1) {
           // From outside to inside
           var n1 = 1 / this.getRefIndexAt(incidentPoint, ray);
@@ -314,14 +310,19 @@ class CurveGrinGlass extends BaseGrinGlass {
         } else {
           // The situation that may cause bugs (e.g. incident on an edge point)
           // To prevent shooting the ray to a wrong direction, absorb the ray
-          console.log("Incident type 0");
+          console.log("Incident type NULL");
           return {
             isAbsorbed: true
           };
         }
+        console.log(
+          "INCIDENT DATA:" + 
+          "\n\tNormal:\t" + incidentData.normal.x + ", " + incidentData.normal.y + 
+          "\n\tS_point:\t" + incidentData.s_point.x + ", " + incidentData.s_point.y + 
+          "\n\tN1:\t" + n1
+        );
         return this.refract(ray, rayIndex, incidentData.s_point, incidentData.normal, n1, surfaceMergingObjs, r_bodyMerging_obj);
       } else {
-        console.log("Is NOT inside glass or outside and incident point on boundary...");
         if (ray.bodyMergingObj === undefined)
           ray.bodyMergingObj = this.initRefIndex(ray); // Initialize the bodyMerging object of the ray
         const next_point = this.step(ray.p1, incidentPoint, ray);
@@ -338,7 +339,7 @@ class CurveGrinGlass extends BaseGrinGlass {
   }
 
   getIncidentType(ray) {
-    console.log("incidentType(" + ray + "):\t" + this.getIncidentData(ray).indidentType);
+    console.log("incidentType(" + ray + "):\t" + this.getIncidentData(ray).incidentType);
     return this.getIncidentData(ray).incidentType;
   }
 
@@ -378,10 +379,9 @@ class CurveGrinGlass extends BaseGrinGlass {
       console.log("Point given:\t" + p3.x + ", " + p3.y);
       console.log("Difference:\t" + (p3.x - closestPoint.x) + ", " + (p3.y - closestPoint.y));
       console.log("Distance:\t" + geometry.distance(geometry.point(p3.x, p3.y), closestPoint));*/
-      console.log("Distance:\t" + this.curves[i].project(geometry.point(p3.x, p3.y)).d);
 
       // If the distance to the nearest point on the current curve from p3 is below the intersect tolerance threshold, p3 is on boundary
-      if (this.curves[i].project(geometry.point(p3.x, p3.y)).d < this.intersectTol) {
+      if (this.curves[i].project(geometry.point(p3.x, p3.y)).d <= this.intersectTol) {
         console.log("INTERSECTION");
         return true;
       }
@@ -394,7 +394,7 @@ class CurveGrinGlass extends BaseGrinGlass {
   getIncidentData(ray) {
     var i = this.tmp_i;
     
-    var intersections = this.curves[i].lineIntersects(geometry.line(ray.p1, ray.p2));
+    var intersections = this.curves[i].lineIntersects(geometry.scaleRayForCurve(ray, this.curves[i]));
     
     var s_point = { x: Infinity, y: Infinity };
     var s_point_tmp = s_point;
@@ -415,13 +415,19 @@ class CurveGrinGlass extends BaseGrinGlass {
     var normal = this.curves[i].normal(s_point.t);
     normal = geometry.point(normal.x, normal.y);
 
+    // Reorient tangent if necessary, to ensure it's on the same side of the curve as p1
+    if (normal.x * (ray.p2.x - ray.p1.x) + normal.y * (ray.p2.y - ray.p1.y) > 0) {
+      normal.x = -normal.x;
+      normal.y = normal.y;
+    }
+
     if (this.isInsideGlass(ray.p1)) {
       var incidentType = 1; // Inside to outside
     } else {
       var incidentType = -1; // Outside to inside
     }
 
-    return { s_point: s_point, normal: normal, incidentType: incidentType }
+    return { s_point: geometry.point(s_point.x, s_point.y), normal: normal, incidentType: incidentType }
   }
 
   getIncidentData_old(ray) {
