@@ -226,11 +226,17 @@ class CurveGrinGlass extends BaseGrinGlass {
     var rp_temp = { x: Infinity, y: Infinity };
     var rp_temp2;
     var intersections = null;
+    var scaled_ray = ray;
 
     for (var i = 0; i < this.path.length; i++) {
       //rp_temp = { x: NaN, y: NaN }; // Reset and populate rp_temp
       s_point_temp = null;
-      intersections = this.curves[i].lineIntersects(geometry.line(geometry.point(ray.p1.x, ray.p1.y), geometry.point(ray.p2.x, ray.p2.y)));//, this.intersectTol);
+
+      // Scale ray to ensure it is long enough to intersect the curve before checking for intersection using BezierJS's curve.lineIntersects function
+      scaled_ray = geometry.scaleRayForCurve(ray, this.curves[i]);
+
+      // Get the closest point of intersection to the first point of the ray on the current curve
+      intersections = this.curves[i].lineIntersects(scaled_ray);//, this.intersectTol);
       if (intersections.length >= 1) {
         // Go through each of them, get the intersection point closest to p1, since it comes sorted by coordinate
         //rp_temp = this.curves[i].get(intersections[0]);
@@ -240,24 +246,26 @@ class CurveGrinGlass extends BaseGrinGlass {
         intersections.forEach((intersection) => {
           rp_temp2 = this.curves[i].get(intersection);
           console.log("cRI cur rp_temp2: " + rp_temp2.x + ", " + rp_temp2.y + "\n\tt: " + intersection + "\n\t" + rp_temp2);
-          if (geometry.distance(geometry.point(rp_temp2.x, rp_temp2.y), geometry.point(ray.p1.x, ray.p1.y)) < geometry.distance(geometry.point(rp_temp.x, rp_temp.y), geometry.point(ray.p1.x, ray.p1.y))) {
+          if (geometry.distance(geometry.point(rp_temp2.x, rp_temp2.y), scaled_ray.p1) < geometry.distance(geometry.point(rp_temp.x, rp_temp.y), scaled_ray.p1)) {
             rp_temp = rp_temp2;
+            rp_temp = geometry.point(rp_temp.x, rp_temp.y);
           }
         });
-        rp_temp = geometry.point(rp_temp.x, rp_temp.y);
         console.log("cRI intersections:\n\tLength: " + intersections.length + "\n\tFirst point: " + rp_temp.x + ", " + rp_temp.y);
-      }
-      //Line segment i->i+1
-      //var rp_temp = geometry.linesIntersection(geometry.line(ray.p1, ray.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
-      if (rp_temp.x) {
-        console.log("cRI rp_temp: " + rp_temp.x + ", " + rp_temp.y);
-      }
-      // Curve i
+      
+        //Line segment i->i+1
+        //var rp_temp = geometry.linesIntersection(geometry.line(ray.p1, ray.p2), geometry.line(this.path[i % this.path.length], this.path[(i + 1) % this.path.length]));
+        // Curve i
 
-      if (geometry.intersectionIsOnCurve(rp_temp, this.curves[i], this.intersectTol) && geometry.intersectionIsOnRay(rp_temp, ray) && geometry.distanceSquared(ray.p1, rp_temp) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
-        s_lensq_temp = geometry.distanceSquared(ray.p1, rp_temp);
-        s_point_temp = rp_temp;
+        //if (geometry.intersectionIsOnCurve(rp_temp, this.curves[i], this.intersectTol) && geometry.intersectionIsOnRay(rp_temp, ray) && geometry.distanceSquared(ray.p1, rp_temp) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
+        if (geometry.intersectionIsOnRay(rp_temp, scaled_ray) && geometry.distanceSquared(scaled_ray.p1, rp_temp) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
+          s_lensq_temp = geometry.distanceSquared(scaled_ray.p1, rp_temp);
+          s_point_temp = rp_temp;
+        }
+      } else {
+        console.log("No intersections found.");
       }
+
       if (s_point_temp) {
         if (s_lensq_temp < s_lensq) {
           s_lensq = s_lensq_temp;
