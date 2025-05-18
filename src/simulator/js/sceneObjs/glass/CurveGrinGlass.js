@@ -152,7 +152,15 @@ class CurveGrinGlass extends BaseGrinGlass {
     var click_lensq = Infinity;
     var click_lensq_temp;
     var targetPoint_index = -1;
-    for (var i = 0; i < this.path.length; i++) {
+    var targetPoint_subindex = -1;
+
+    // Dragging the entire this
+    const mousePos = mouse.getPosSnappedToGrid();
+    dragContext.mousePos0 = mousePos; // Mouse position when the user starts dragging
+    dragContext.mousePos1 = mousePos; // Mouse position at the last moment during dragging
+    dragContext.snapContext = {};
+
+    for (var i = 0; i < this.curves.length; i++) {
       if (mouse.isOnPoint(this.path[i])) {
         click_lensq_temp = geometry.distanceSquared(mouse.pos, this.path[i]);
         if (click_lensq_temp <= click_lensq) {
@@ -160,44 +168,101 @@ class CurveGrinGlass extends BaseGrinGlass {
           targetPoint_index = i;
         }
       }
+      for (var j = 1; j < 3; j++) {
+        if (mouse.isOnPoint(this.curves[i].points[j])) {
+          click_lensq_temp = geometry.distanceSquared(mouse.pos, this.curves[i].points[j]);
+          if (click_lensq_temp <= click_lensq) {
+            click_lensq = click_lensq_temp;
+            targetPoint_index = i;
+            targetPoint_subindex = j;
+          }
+        }
+      }
     }
     if (targetPoint_index != -1) {
-      dragContext.part = 1;
-      dragContext.index = targetPoint_index;
-      dragContext.targetPoint = geometry.point(this.path[targetPoint_index].x, this.path[targetPoint_index].y);
-      return dragContext;
-    }
-
-    for (var i = 0; i < this.path.length; i++) {
-      if (mouse.isOnSegment(geometry.line(this.path[(i) % this.path.length], this.path[(i + 1) % this.path.length]))) {
-        // Dragging the entire this
-        const mousePos = mouse.getPosSnappedToGrid();
-        dragContext.part = 0;
-        dragContext.mousePos0 = mousePos; // Mouse position when the user starts dragging
-        dragContext.mousePos1 = mousePos; // Mouse position at the last moment during dragging
-        dragContext.snapContext = {};
+      if (targetPoint_subindex != -1) {
+        dragContext.part = targetPoint_subindex + 1;
+        dragContext.index = targetPoint_index;
+        dragContext.targetPoint = this.curves[targetPoint_index].points[targetPoint_subindex];
         return dragContext;
+      } else {
+        dragContext.part = 1;
+        dragContext.index = targetPoint_index;
+        dragContext.targetPoint = this.path[targetPoint_index];
+        return dragContext;
+      }
+    }
+    for (var i = 0; i < this.curves.length; i++) {
+      if (mouse.isOnCurve(this.curves[i])) {
+          // Dragging the entire this
+          /*const mousePos = mouse.getPosSnappedToGrid();
+          dragContext.mousePos0 = mousePos; // Mouse position when the user starts dragging
+          dragContext.mousePos1 = mousePos; // Mouse position at the last moment during dragging
+          dragContext.snapContext = {};*/
+          dragContext.part = 0;
+          return dragContext;
       }
     }
   }
 
   onDrag(mouse, dragContext, ctrl, shift) {
-    const mousePos = mouse.getPosSnappedToGrid();
+    var mousePos;
+    var mod = 0;
+    var closest = { x: 0, y: 0 };
 
-    if (dragContext.part == 1) {
-      this.path[dragContext.index].x = mousePos.x;
-      this.path[dragContext.index].y = mousePos.y;
+    if (shift) {
+      mod++;
+    }
+    if (ctrl) {
+      mod += 2;
     }
 
-    if (dragContext.part == 0) {
+    if (dragContext.part === 1) {
+      switch (mod) {
+        default:
+          mousePos = mouse.getPosSnappedToGrid();
+          dragContext.snapContext = {}; // Unlock the dragging direction when the user release the shift key
+          break;
+        case 1, 3:
+          mousePos = mouse.getPosSnappedToDirection(dragContext.mousePos0, [{ x: 1, y: 0 }, { x: 0, y: 1 }], dragContext.snapContext);
+          break;
+        case 2:
+          if (geometry.distance(this.path[(dragContext.index - 1 + this.path.length) % this.path.length], this.path[dragContext.index]) < geometry.distance(this.path[(dragContext.index + 1) % this.path.length], this.path[dragContext.index])) {
+            closest = this.path[(dragContext.index - 1 + this.path.length) % this.path.length];
+          } else {
+            closest = this.path[(dragContext.index + 1) % this.path.length];
+          }
+          mousePos = mouse.getPosSnappedToDirection(geometry.point(closest.x, closest.y), [{ x: 1, y: 0 }, { x: 0, y: 1 }], dragContext.snapContext);
+          break;
+      }
+      this.path[dragContext.index].x = mousePos.x;
+      this.path[dragContext.index].y = mousePos.y;
+      this.curves[dragContext.index].points[0] = geometry.point(mousePos.x, mousePos.y);
+      this.curves[(dragContext.index - 1 + this.curves.length) % this.curves.length].points[3] = geometry.point(mousePos.x, mousePos.y);
+      this.curves[dragContext.index].update();
+      this.curves[(dragContext.index - 1 + this.curves.length) % this.curves.length].update();
+    }
+
+    else if (dragContext.part === 2 || dragContext.part === 3) {
       if (shift) {
-        var mousePosSnapped = mouse.getPosSnappedToDirection(dragContext.mousePos0, [{ x: 1, y: 0 }, { x: 0, y: 1 }], dragContext.snapContext);
+        mousePos = mouse.getPosSnappedToDirection(dragContext.mousePos0, [{ x: 1, y: 0 }, { x: 0, y: 1 }], dragContext.snapContext);
       } else {
-        var mousePosSnapped = mouse.getPosSnappedToGrid();
+        mousePos = mouse.getPosSnappedToGrid();
         dragContext.snapContext = {}; // Unlock the dragging direction when the user release the shift key
       }
-      this.move(mousePosSnapped.x - dragContext.mousePos1.x, mousePosSnapped.y - dragContext.mousePos1.y);
-      dragContext.mousePos1 = mousePosSnapped;
+      this.curves[dragContext.index].points[dragContext.part - 1] = geometry.point(mousePos.x, mousePos.y);
+      this.curves[dragContext.index].update();
+    }
+
+    else if (dragContext.part === 0) {
+      if (shift) {
+        mousePos = mouse.getPosSnappedToDirection(dragContext.mousePos0, [{ x: 1, y: 0 }, { x: 0, y: 1 }], dragContext.snapContext);
+      } else {
+        mousePos = mouse.getPosSnappedToGrid();
+        dragContext.snapContext = {}; // Unlock the dragging direction when the user release the shift key
+      }
+      this.move(mousePos.x - dragContext.mousePos1.x, mousePos.y - dragContext.mousePos1.y);
+      dragContext.mousePos1 = mousePos;
     }
   }
 
