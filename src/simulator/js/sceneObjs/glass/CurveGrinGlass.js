@@ -193,7 +193,7 @@ class CurveGrinGlass extends BaseGrinGlass {
       }
     }
     for (var i = 0; i < this.curves.length; i++) {
-      if (mouse.isOnCurve(this.curves[i])) {
+      if (mouse.isOnCurve(geometry.curve(this.curves[i].points))) {
           // Dragging the entire this
           /*const mousePos = mouse.getPosSnappedToGrid();
           dragContext.mousePos0 = mousePos; // Mouse position when the user starts dragging

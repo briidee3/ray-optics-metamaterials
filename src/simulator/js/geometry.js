@@ -93,8 +93,13 @@ const geometry = {
    * @param {Point} p2 - The end point of the curve.
    * @param {Point} c1 - The first control point of the curve.
    * @param {Point} c2 - The second control point of the curve.
+   * @return {Bezier}
    */
-  curve: function (p1, p2, c1, c2) { return { p1: p1, p2: p2, c1: c1, c2: c2 } },
+  curve: function (p1, c1, c2, p2) { 
+    var bezier = new Bezier(p1, c1, c2, p2);
+
+    return bezier;
+  },
 
   /**
   * Calculate the dot product, where the two points are treated as vectors.

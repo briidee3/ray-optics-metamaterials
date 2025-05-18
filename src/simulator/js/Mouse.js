@@ -15,7 +15,7 @@
  */
 
 import geometry from './geometry.js';
-import Bezier from 'bezier-js';
+import {Bezier} from 'bezier-js';
 
 /**
  * The Mouse class encapsulates the state of the mouse within the scene.
@@ -91,7 +91,7 @@ class Mouse {
 
   /**
    * Determines if the mouse is currently over a given curve.
-   * @param {Bezier} curve - The curve to check against the mouse position.
+   * @param {geometry.curve} curve - The curve to check against the mouse position.
    * @returns {boolean} True if the mouse is on the given curve, false otherwise.
    */
   isOnCurve(curve) {
