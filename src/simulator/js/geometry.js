@@ -369,6 +369,17 @@ const geometry = {
     var d2 = geometry.point(dx2, dy2)
     var magnitude = geometry.dot(geometry.point(dx1, dy1), d2) / geometry.dot(d2, d2);
     return geometry.line(l1.p1, geometry.point(l1.p1.x + dx2 * magnitude, l1.p1.y + dy2 * magnitude));
+  },
+
+  /**
+   * Normalize the given point as if it were a vector.
+   * @param {Point} p1
+   * @return {Point}
+   */
+  normalize: function (p1) {
+    var len = geometry.distance(geometry.point(0, 0), p1);
+    
+    return geometry.point(p1.x / len, p1.y / len);
   }
 };
 
