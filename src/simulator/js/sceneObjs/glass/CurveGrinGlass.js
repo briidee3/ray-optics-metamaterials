@@ -47,7 +47,7 @@ class CurveGrinGlass extends BaseGrinGlass {
     refIndexFn: '1.1+0.1\\cdot\\cos\\left(0.1\\cdot y\\right)',
     origin: { x: 0, y: 0 },
     stepSize: 1,
-    intersectTol: 0.05,
+    intersectTol: 1e-3,//0.05,
     rayLen: 0.001
   };
   
@@ -300,7 +300,7 @@ class CurveGrinGlass extends BaseGrinGlass {
       scaled_ray = geometry.scaleRayForCurve(ray, this.curves[i]);
 
       // Get the closest point of intersection to the first point of the ray on the current curve
-      intersections = this.curves[i].lineIntersects(scaled_ray);//, this.intersectTol);
+      intersections = this.curves[i].lineIntersects(scaled_ray);
       if (intersections.length >= 1) {
         // Go through each of them, get the intersection point closest to p1, since it comes sorted by coordinate
         //rp_temp = this.curves[i].get(intersections[0]);
@@ -322,6 +322,7 @@ class CurveGrinGlass extends BaseGrinGlass {
         // Curve i
 
         //if (geometry.intersectionIsOnCurve(rp_temp, this.curves[i], this.intersectTol) && geometry.intersectionIsOnRay(rp_temp, ray) && geometry.distanceSquared(ray.p1, rp_temp) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
+        // Intersection with curve can be assumed since that's where we got the point in the first place (above), hence there's no second check for if the point is on the curve here.
         if (geometry.intersectionIsOnRay(geometry.point(rp_temp.x, rp_temp.y), scaled_ray) && geometry.distanceSquared(scaled_ray.p1, geometry.point(rp_temp.x, rp_temp.y)) > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
           s_lensq_temp = geometry.distanceSquared(scaled_ray.p1, rp_temp);
           s_point_temp = rp_temp;
@@ -470,7 +471,8 @@ class CurveGrinGlass extends BaseGrinGlass {
       
 
       // New old
-      var projection = this.curves[i].project(geometry.point(p3.x, p3.y));
+      // Check how far away the nearest point on the curve to p3 is from p3
+      var projection = this.curves[i].project({ x: p3.x, y: p3.y });
 
       if (projection.d ** 2 <= this.intersectTol) {
         console.log("INTERSECTION: " + projection.d + "");
@@ -524,29 +526,33 @@ class CurveGrinGlass extends BaseGrinGlass {
   /* Utility methods */
 
   getIncidentData(ray) {
+    // Assuming this.checkRayIntersects(ray) has already been called, this.tmp_i should correspond to the curve in which the nearest intersection lays
     var i = this.tmp_i;
     
+    // Get all intersections with the aforementioned curve
     var intersections = this.curves[i].lineIntersects(geometry.scaleRayForCurve(ray, this.curves[i]));
     
     var s_point = { x: Infinity, y: Infinity, t: 0 };
     var s_point_tmp = s_point;
 
-    // Get normal from the curve
+    // Get normal from the curve at the nearest intersection to ray.p1
     if (intersections.length >= 1) {
-      s_point = this.curves[i].get(intersections[0]);
+      //s_point = this.curves[i].get(intersections[0]);
       
       // Get closest intersection on curve to current point (for when there are multiple intersections on the curve)
       intersections.forEach((intersection) => {
         s_point_tmp = this.curves[i].get(intersection);
-        if (geometry.distanceSquared(geometry.point(s_point_tmp.x, s_point_tmp.y), geometry.point(ray.p1.x, ray.p1.y)) < geometry.distanceSquared(geometry.point(s_point.x, s_point.y), geometry.point(ray.p1.x, ray.p1.y))) {
+        if (geometry.distanceSquared(geometry.point(s_point_tmp.x, s_point_tmp.y), ray.p1) < geometry.distanceSquared(geometry.point(s_point.x, s_point.y), ray.p1)) {
           s_point = s_point_tmp;
         }
       });
     }
 
+    // Get the normalized normal vector of the curve at the intersection point
     var normal = this.curves[i].normal(s_point.t);
     normal = geometry.point(normal.x, normal.y);
 
+    // Important note: Since we're dealing with computer graphics, negative y is up and positive y is down, as that's the standard convention.
     console.log(
       "NORMALS:" +
       "\n\tUnchanged:\t" + normal.x + ", " + normal.y +
@@ -555,7 +561,9 @@ class CurveGrinGlass extends BaseGrinGlass {
       "\n\t-x, +y:\t" + (-normal.x) + ", " + (normal.y)
     )
 
-    // Reorient tangent if necessary, to ensure it's on the same side of the curve as p1
+    // Reorient tangent if necessary, to ensure it's on the same side of the curve as p1. 
+    //  This is necessary due to how BezierJS calculates normals to always be on the same side relative to the path from its first anchor point to its second anchor point. 
+    //  All this does is flip the normal vector about the point on the curve which acts as its point of origin if the normal is pointing in the same direction of the ray as per the sign of the dot product.
     if (normal.x * (ray.p2.x - ray.p1.x) + normal.y * (ray.p2.y - ray.p1.y) > 0) {
       normal.x = -normal.x;
       normal.y = -normal.y;
@@ -572,6 +580,129 @@ class CurveGrinGlass extends BaseGrinGlass {
     }
 
     return { s_point: s_point, normal: geometry.point(normal.x, normal.y), incidentType: incidentType }
+  }
+
+  /**
+   * Handle refraction.
+   * Based on the existing function in BaseGlass.js.
+   * @param {Ray} ray - The ray to be refracted.
+   * @param {number} rayIndex - The index of the ray in the ray array.
+   * @param {Point} incidentPoint - The incident point.
+   * @param {Point} normal - The normal vector at the incident point.
+   * @param {number} n1 - The effective refractive index of the current object (after determining the direction of incident of the current object, but before merging the surface with other objects).
+   * @param {Array<BaseSceneObj>} surfaceMergingObjs - The objects that are to be merged with the current object.
+   * @param {BaseGrinGlass} bodyMergingObj - The object that is to be merged with the current object.
+   * @returns {SimulationReturn} The return value for `onRayIncident`.
+   */
+  refract(ray, rayIndex, incidentPoint, normal, n1, surfaceMergingObjs, bodyMergingObj) {
+
+    // Surface merging
+    for (var i = 0; i < surfaceMergingObjs.length; i++) {
+      let incidentType = surfaceMergingObjs[i].getIncidentType(ray);
+      if (incidentType == 1) {
+        // From inside to outside
+        n1 *= surfaceMergingObjs[i].getRefIndexAt(incidentPoint, ray);
+        surfaceMergingObjs[i].onRayExit(ray);
+      } else if (incidentType == -1) {
+        // From outside to inside
+        n1 /= surfaceMergingObjs[i].getRefIndexAt(incidentPoint, ray);
+        surfaceMergingObjs[i].onRayEnter(ray);
+      } else if (incidentType == 0) {
+        // Equivalent to not intersecting with the obj (e.g. two interfaces overlap)
+        //n1=n1;
+      } else {
+        // Situation that may cause bugs (e.g. incident on an edge point)
+        // To prevent shooting the ray to a wrong direction, absorb the ray
+        return {
+          isAbsorbed: true
+        };
+      }
+    }
+
+    var normal_len = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
+    var normal_x = normal.x / normal_len;
+    var normal_y = normal.y / normal_len;
+
+    var ray_len = Math.sqrt((ray.p2.x - ray.p1.x) * (ray.p2.x - ray.p1.x) + (ray.p2.y - ray.p1.y) * (ray.p2.y - ray.p1.y));
+
+    var ray_x = (ray.p2.x - ray.p1.x) / ray_len;
+    var ray_y = (ray.p2.y - ray.p1.y) / ray_len;
+
+
+    // Reference http://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
+
+    var cos1 = -normal_x * ray_x - normal_y * ray_y;
+    var sq1 = 1 - n1 * n1 * (1 - cos1 * cos1);
+
+
+    if (sq1 < 0) {
+      // Total internal reflection
+      ray.p1 = incidentPoint;
+      ray.p2 = geometry.point(incidentPoint.x + ray_x + 2 * cos1 * normal_x, incidentPoint.y + ray_y + 2 * cos1 * normal_y);
+      if (bodyMergingObj) {
+        ray.bodyMergingObj = bodyMergingObj;
+      }
+    } else {
+      // Refraction
+      var cos2 = Math.sqrt(sq1);
+      if (n1 < 0) {
+        // Flip about the normal
+        cos2 = -cos2;
+      }
+
+      var R_s = Math.pow((n1 * cos1 - cos2) / (n1 * cos1 + cos2), 2);
+      var R_p = Math.pow((n1 * cos2 - cos1) / (n1 * cos2 + cos1), 2);
+      // Reference http://en.wikipedia.org/wiki/Fresnel_equations#Definitions_and_power_equations
+
+      let newRays = [];
+      let truncation = 0;
+
+      // Handle the reflected ray
+      var ray2 = geometry.line(incidentPoint, geometry.point(incidentPoint.x + ray_x + 2 * cos1 * normal_x, incidentPoint.y + ray_y + 2 * cos1 * normal_y));
+      ray2.brightness_s = ray.brightness_s * R_s;
+      ray2.brightness_p = ray.brightness_p * R_p;
+      ray2.wavelength = ray.wavelength;
+      ray2.gap = ray.gap;
+      if (bodyMergingObj) {
+        ray2.bodyMergingObj = bodyMergingObj;
+      }
+      if (ray2.brightness_s + ray2.brightness_p > (this.scene.colorMode != 'default' ? 1e-6 : 0.01)) {
+        newRays.push(ray2);
+      } else {
+        truncation += ray2.brightness_s + ray2.brightness_p;
+        if (!ray.gap && !this.scene.colorMode != 'default') {
+          var amp = Math.floor(0.01 / ray2.brightness_s + ray2.brightness_p) + 1;
+          if (rayIndex % amp == 0) {
+            ray2.brightness_s = ray2.brightness_s * amp;
+            ray2.brightness_p = ray2.brightness_p * amp;
+            newRays.push(ray2);
+          }
+        }
+      }
+
+      // Handle the refracted ray
+      ray.p1 = incidentPoint;
+      if (n1 < 0) {
+        ray.p2 = geometry.point(incidentPoint.x - n1 * ray_x + (n1 * cos1 - cos2) * normal_x, incidentPoint.y - n1 * ray_y + (n1 * cos1 - cos2) * normal_y);
+      } else {
+        ray.p2 = geometry.point(incidentPoint.x + n1 * ray_x + (n1 * cos1 - cos2) * normal_x, incidentPoint.y + n1 * ray_y + (n1 * cos1 - cos2) * normal_y);
+      }
+      ray.brightness_s = ray.brightness_s * (1 - R_s);
+      ray.brightness_p = ray.brightness_p * (1 - R_p);
+
+      if (ray.brightness_s + ray.brightness_p > (this.scene.colorMode != 'default' ? 1e-6 : 0)) {
+        return {
+          newRays: newRays,
+          truncation: truncation
+        };
+      } else {
+        return {
+          isAbsorbed: true,
+          newRays: newRays,
+          truncation: truncation + ray.brightness_s + ray.brightness_p
+        };
+      }
+    }
   }
 
   getIncidentData_old(ray) {
@@ -713,11 +844,11 @@ class CurveGrinGlass extends BaseGrinGlass {
   }
 
   // Implementation of the "crossing number algorithm" (see - https://en.wikipedia.org/wiki/Point_in_polygon)
-  // Using p3 and (0, 0), since it shouldn't make a difference what the second point is for just getting even or odd to find out if in or out of object.
+  // Using p3 and (0, 0), as the purpose of this function is to test whether the number of intersections is even or odd, hence the actual number is irrelevant, hence any secondary point will do for our purposes.
   countIntersections(p3) {
     
     var cnt = 0;
-    for (let i = 0; i < this.path.length; i++) {
+    for (let i = 0; i < this.curves.length; i++) {
       // Add the number of intersections found on the current curve from p3 to (0, 0)
       cnt += this.curves[i].intersects(geometry.line(geometry.point(p3.x, p3.y), {x: 0, y: 0})).length;// ? 1 : 0;
     }
@@ -725,23 +856,20 @@ class CurveGrinGlass extends BaseGrinGlass {
   }
 
   // Generate default control points from path (helper method)
-  generateDefaultControlPoints(prev, cur, next) {
-    //var line = geometry.parallelLineThroughPoint(geometry.line(prev, next), cur);
-    const nextMidpoint = geometry.segmentMidpoint(geometry.line(cur, next));
-    const prevMidpoint = geometry.segmentMidpoint(geometry.line(prev, cur));
+  generateDefaultControlPoints(pts) {
+    const cpVec1 = geometry.normalize(geometry.point(pts[2].x - pts[0].x, pts[2].y - pts[0].y));
+    const cpVec2 = geometry.normalize(geometry.point(pts[3].x - pts[1].x, pts[3].y - pts[1].y));
 
-    const nextLine = geometry.orthoProj(geometry.line(cur, nextMidpoint), geometry.line(prev, next));
-    const prevLine = geometry.orthoProj(geometry.line(prevMidpoint, cur), geometry.line(next, prev));
-
-    return [ geometry.point(cur.x + prevLine.p2.x - prevLine.p1.x, cur.y + prevLine.p2.y - prevLine.p1.y), geometry.point(cur.x + nextLine.p2.x - nextLine.p1.x, cur.y + nextLine.p2.y - nextLine.p1.y) ];
+    return [ geometry.point(pts[1].x + cpVec1.x * 50, pts[1].y + cpVec1.y * 50), geometry.point(pts[2].x - cpVec2.x * 50, pts[2].y - cpVec2.y * 50) ];
   }
 
-  // Generate Poly Bezier from path
+  // Generate Poly Bezier (i.e. set of Bezier curves which will form the boundaries of the lens) from path
   generatePolyBezier() {
     this.curves = [];
+    var curCtrlPts;
     // Create one curve for each line
     for (var i = 0; i < this.path.length; i++) {
-      let curCtrlPts = this.generateDefaultControlPoints(this.path[(i - 1 + this.path.length) % this.path.length], this.path[i], this.path[(i + 1) % this.path.length])
+      curCtrlPts = this.generateDefaultControlPoints([ this.path[(i - 1 + this.path.length) % this.path.length], this.path[i], this.path[(i + 1) % this.path.length], this.path[(i + 2) % this.path.length] ]);
       this.curves.push(new Bezier(this.path[i], curCtrlPts[0], curCtrlPts[1], this.path[(i + 1) % this.path.length]));
       //this.drawCurve(this.curves[i], this.path[i], canvasRenderer);
     }
