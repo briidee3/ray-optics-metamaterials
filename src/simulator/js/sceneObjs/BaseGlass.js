@@ -128,7 +128,8 @@ class BaseGlass extends BaseSceneObj {
   }
 
   /**
-   * Do the refraction calculation at the surface of the glass.
+   * Handle refraction.
+   * Based on the existing function in BaseGlass.js.
    * @param {Ray} ray - The ray to be refracted.
    * @param {number} rayIndex - The index of the ray in the ray array.
    * @param {Point} incidentPoint - The incident point.
@@ -163,9 +164,9 @@ class BaseGlass extends BaseSceneObj {
       }
     }
 
-    var normal_len = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
-    var normal_x = normal.x / normal_len;
-    var normal_y = normal.y / normal_len;
+    //var normal_len = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
+    var normal_x = normal.x// / normal_len;
+    var normal_y = normal.y// / normal_len;
 
     var ray_len = Math.sqrt((ray.p2.x - ray.p1.x) * (ray.p2.x - ray.p1.x) + (ray.p2.y - ray.p1.y) * (ray.p2.y - ray.p1.y));
 
@@ -189,6 +190,11 @@ class BaseGlass extends BaseSceneObj {
     } else {
       // Refraction
       var cos2 = Math.sqrt(sq1);
+
+      // Flip about the normal if negative refractive index
+      if (n1 < 0) {
+        cos2 = -cos2;
+      }
 
       var R_s = Math.pow((n1 * cos1 - cos2) / (n1 * cos1 + cos2), 2);
       var R_p = Math.pow((n1 * cos2 - cos1) / (n1 * cos2 + cos1), 2);
@@ -222,7 +228,11 @@ class BaseGlass extends BaseSceneObj {
 
       // Handle the refracted ray
       ray.p1 = incidentPoint;
-      ray.p2 = geometry.point(incidentPoint.x + n1 * ray_x + (n1 * cos1 - cos2) * normal_x, incidentPoint.y + n1 * ray_y + (n1 * cos1 - cos2) * normal_y);
+      if (n1 < 0) {
+        ray.p2 = geometry.point(incidentPoint.x + n1 * ray_x + (n1 * cos1 + cos2) * normal_x, incidentPoint.y + n1 * ray_y + (n1 * cos1 + cos2) * normal_y);
+      } else {
+        ray.p2 = geometry.point(incidentPoint.x + n1 * ray_x + (n1 * cos1 - cos2) * normal_x, incidentPoint.y + n1 * ray_y + (n1 * cos1 - cos2) * normal_y);
+      }
       ray.brightness_s = ray.brightness_s * (1 - R_s);
       ray.brightness_p = ray.brightness_p * (1 - R_p);
 

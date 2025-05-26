@@ -34,7 +34,7 @@ import { Bezier } from 'bezier-js';
  * @property {string} refIndexFn - The refractive index function in x and y in LaTeX format.
  * @property {Point} origin - The origin of the (x,y) coordinates used in the refractive index function.
  * @property {number} stepSize - The step size for the ray trajectory equation.
- * @property {number} intersectTol - Tolerance for intersection calculations.
+ * @property {number} intersectTol - Tolerance for intersection calculations in pixels
  */
 class CurveGrinGlass extends BaseGrinGlass {
   static type = 'CurveGrinGlass';
@@ -47,7 +47,7 @@ class CurveGrinGlass extends BaseGrinGlass {
     refIndexFn: '1.1+0.1\\cdot\\cos\\left(0.1\\cdot y\\right)',
     origin: { x: 0, y: 0 },
     stepSize: 1,
-    intersectTol: 1e-3,//0.05,
+    intersectTol: 0.05, // Tolerance is 1/20 of a pixel
     rayLen: 0.001
   };
   
@@ -580,129 +580,6 @@ class CurveGrinGlass extends BaseGrinGlass {
     }
 
     return { s_point: s_point, normal: geometry.point(normal.x, normal.y), incidentType: incidentType }
-  }
-
-  /**
-   * Handle refraction.
-   * Based on the existing function in BaseGlass.js.
-   * @param {Ray} ray - The ray to be refracted.
-   * @param {number} rayIndex - The index of the ray in the ray array.
-   * @param {Point} incidentPoint - The incident point.
-   * @param {Point} normal - The normal vector at the incident point.
-   * @param {number} n1 - The effective refractive index of the current object (after determining the direction of incident of the current object, but before merging the surface with other objects).
-   * @param {Array<BaseSceneObj>} surfaceMergingObjs - The objects that are to be merged with the current object.
-   * @param {BaseGrinGlass} bodyMergingObj - The object that is to be merged with the current object.
-   * @returns {SimulationReturn} The return value for `onRayIncident`.
-   */
-  refract(ray, rayIndex, incidentPoint, normal, n1, surfaceMergingObjs, bodyMergingObj) {
-
-    // Surface merging
-    for (var i = 0; i < surfaceMergingObjs.length; i++) {
-      let incidentType = surfaceMergingObjs[i].getIncidentType(ray);
-      if (incidentType == 1) {
-        // From inside to outside
-        n1 *= surfaceMergingObjs[i].getRefIndexAt(incidentPoint, ray);
-        surfaceMergingObjs[i].onRayExit(ray);
-      } else if (incidentType == -1) {
-        // From outside to inside
-        n1 /= surfaceMergingObjs[i].getRefIndexAt(incidentPoint, ray);
-        surfaceMergingObjs[i].onRayEnter(ray);
-      } else if (incidentType == 0) {
-        // Equivalent to not intersecting with the obj (e.g. two interfaces overlap)
-        //n1=n1;
-      } else {
-        // Situation that may cause bugs (e.g. incident on an edge point)
-        // To prevent shooting the ray to a wrong direction, absorb the ray
-        return {
-          isAbsorbed: true
-        };
-      }
-    }
-
-    var normal_len = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
-    var normal_x = normal.x / normal_len;
-    var normal_y = normal.y / normal_len;
-
-    var ray_len = Math.sqrt((ray.p2.x - ray.p1.x) * (ray.p2.x - ray.p1.x) + (ray.p2.y - ray.p1.y) * (ray.p2.y - ray.p1.y));
-
-    var ray_x = (ray.p2.x - ray.p1.x) / ray_len;
-    var ray_y = (ray.p2.y - ray.p1.y) / ray_len;
-
-
-    // Reference http://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
-
-    var cos1 = -normal_x * ray_x - normal_y * ray_y;
-    var sq1 = 1 - n1 * n1 * (1 - cos1 * cos1);
-
-
-    if (sq1 < 0) {
-      // Total internal reflection
-      ray.p1 = incidentPoint;
-      ray.p2 = geometry.point(incidentPoint.x + ray_x + 2 * cos1 * normal_x, incidentPoint.y + ray_y + 2 * cos1 * normal_y);
-      if (bodyMergingObj) {
-        ray.bodyMergingObj = bodyMergingObj;
-      }
-    } else {
-      // Refraction
-      var cos2 = Math.sqrt(sq1);
-      if (n1 < 0) {
-        // Flip about the normal
-        cos2 = -cos2;
-      }
-
-      var R_s = Math.pow((n1 * cos1 - cos2) / (n1 * cos1 + cos2), 2);
-      var R_p = Math.pow((n1 * cos2 - cos1) / (n1 * cos2 + cos1), 2);
-      // Reference http://en.wikipedia.org/wiki/Fresnel_equations#Definitions_and_power_equations
-
-      let newRays = [];
-      let truncation = 0;
-
-      // Handle the reflected ray
-      var ray2 = geometry.line(incidentPoint, geometry.point(incidentPoint.x + ray_x + 2 * cos1 * normal_x, incidentPoint.y + ray_y + 2 * cos1 * normal_y));
-      ray2.brightness_s = ray.brightness_s * R_s;
-      ray2.brightness_p = ray.brightness_p * R_p;
-      ray2.wavelength = ray.wavelength;
-      ray2.gap = ray.gap;
-      if (bodyMergingObj) {
-        ray2.bodyMergingObj = bodyMergingObj;
-      }
-      if (ray2.brightness_s + ray2.brightness_p > (this.scene.colorMode != 'default' ? 1e-6 : 0.01)) {
-        newRays.push(ray2);
-      } else {
-        truncation += ray2.brightness_s + ray2.brightness_p;
-        if (!ray.gap && !this.scene.colorMode != 'default') {
-          var amp = Math.floor(0.01 / ray2.brightness_s + ray2.brightness_p) + 1;
-          if (rayIndex % amp == 0) {
-            ray2.brightness_s = ray2.brightness_s * amp;
-            ray2.brightness_p = ray2.brightness_p * amp;
-            newRays.push(ray2);
-          }
-        }
-      }
-
-      // Handle the refracted ray
-      ray.p1 = incidentPoint;
-      if (n1 < 0) {
-        ray.p2 = geometry.point(incidentPoint.x - n1 * ray_x + (n1 * cos1 - cos2) * normal_x, incidentPoint.y - n1 * ray_y + (n1 * cos1 - cos2) * normal_y);
-      } else {
-        ray.p2 = geometry.point(incidentPoint.x + n1 * ray_x + (n1 * cos1 - cos2) * normal_x, incidentPoint.y + n1 * ray_y + (n1 * cos1 - cos2) * normal_y);
-      }
-      ray.brightness_s = ray.brightness_s * (1 - R_s);
-      ray.brightness_p = ray.brightness_p * (1 - R_p);
-
-      if (ray.brightness_s + ray.brightness_p > (this.scene.colorMode != 'default' ? 1e-6 : 0)) {
-        return {
-          newRays: newRays,
-          truncation: truncation
-        };
-      } else {
-        return {
-          isAbsorbed: true,
-          newRays: newRays,
-          truncation: truncation + ray.brightness_s + ray.brightness_p
-        };
-      }
-    }
   }
 
   getIncidentData_old(ray) {
