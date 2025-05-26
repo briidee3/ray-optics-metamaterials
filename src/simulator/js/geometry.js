@@ -356,19 +356,14 @@ const geometry = {
   },
 
   /**
-   * Calculate the orthogonal projection of l1 onto l2.
-   * @param {Line} l1
-   * @param {Line} l2
+   * Calculate the orthogonal projection of vector p1 onto vector p2.
+   * @param {Point} p1
+   * @param {Point} p2
    * @return {Line}
    */
-  orthoProj: function (l1, l2) {
-    var dx1 = l1.p2.x - l1.p1.x
-    var dy1 = l1.p2.y - l1.p1.y
-    var dx2 = l2.p2.x - l2.p1.x
-    var dy2 = l2.p2.y - l2.p1.y
-    var d2 = geometry.point(dx2, dy2)
-    var magnitude = geometry.dot(geometry.point(dx1, dy1), d2) / geometry.dot(d2, d2);
-    return geometry.line(l1.p1, geometry.point(l1.p1.x + dx2 * magnitude, l1.p1.y + dy2 * magnitude));
+  orthoProj: function (p1, p2) {
+    const magnitude = geometry.dot(p1, p2) / geometry.dot(p2, p2);
+    return geometry.point(magnitude * p2.x, magnitude * p2.y);
   },
 
   /**
