@@ -11,9 +11,9 @@ The non-technical guide below will not allow you to see the actual source code.
 If you are not familiar with the development environment but still want to run the project locally, you can follow the steps below.
 
 1. Download and install [Simple Web Server](https://simplewebserver.org/).
-2. Download the [latest deployment of this project](https://github.com/ricktu288/ray-optics/archive/refs/heads/gh-pages.zip) or the latest release (see below) and unzip it.
+2. Download the [latest deployment of this project](https://github.com/briidee3/ray-optics-metamaterials/raw/refs/heads/master/run-locally/dist.zip) or the latest release (see below) and unzip it.
 3. Start Simple Web Server, click "New Server".
-4. Set "Folder Path" to the "ray-optics-gh-pages" folder you just unzipped. Note that some systems may put the folder in another folder with the same name. Please select the inner one.
+4. Set "Folder Path" to the "ray-optics-metamaterials" folder you just unzipped. Note that some systems may put the folder in another folder with the same name. Please select the inner one.
 5. Expand "Basic Options" and turn on "Exclude .html extension". It should look like this:
 
     ![Simple Web Server](https://raw.githubusercontent.com/ricktu288/ray-optics/refs/heads/master/run-locally/simple-web-server-config.png)
@@ -24,7 +24,7 @@ If you are not familiar with the development environment but still want to run t
 
     ![Simple Web Server](https://raw.githubusercontent.com/ricktu288/ray-optics/refs/heads/master/run-locally/simple-web-server-running.png)
 
-9. To update the project, simply download again the [latest deployment](https://github.com/ricktu288/ray-optics/archive/refs/heads/gh-pages.zip), unzip it, and replace the "ray-optics-gh-pages" folder with the new one.
+9. To update the project, simply download again the [latest deployment](https://github.com/briidee3/ray-optics-metamaterials/raw/refs/heads/master/run-locally/dist.zip), unzip it, and replace the "ray-optics-metamaterials" folder with the new one.
 
 Note that if your local version is outdated, and you try to open a scene created with a newer version and uses new features, the scene in the outdated simulator may function incorrectly without warning.
 
