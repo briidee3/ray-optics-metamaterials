@@ -91,7 +91,7 @@ class Mouse {
 
   /**
    * Determines if the mouse is currently over a given curve.
-   * @param {geometry.curve} curve - The curve to check against the mouse position.
+   * @param {Bezier} curve - The curve to check against the mouse position.
    * @returns {boolean} True if the mouse is on the given curve, false otherwise.
    */
   isOnCurve(curve) {
