@@ -19,7 +19,7 @@ import i18next from 'i18next';
 import Simulator from '../../Simulator.js';
 import geometry from '../../geometry.js';
 import { Bezier } from 'bezier-js';
-import { e } from 'mathjs';
+import { e, molarVolumeDependencies } from 'mathjs';
 
 /**
  * Gradient-index glass of the shape of a polygon
@@ -67,7 +67,7 @@ class CurveGrinGlass extends BaseGrinGlass {
     if (this.notDone) {
       // Draw existing lenses
       if (this.curves.length !== 0) {
-        for (var l = 0; l < this.curves.length - 1; l++) {
+        for (var l = 0; l < this.curves.length; l++) {
           // The user has completed drawing the object
           ctx.beginPath();
           ctx.moveTo(this.path[l][0].x, this.path[l][0].y);
@@ -125,25 +125,20 @@ class CurveGrinGlass extends BaseGrinGlass {
   }
 
   move(diffX, diffY) {
-    var tmpPoints;
-
-    // Set of lenses
+    // Each lens
     for (var l = 0; l < this.curves.length; l++) {
-      // Lens
+      // Each curve in lens
       for (var i = 0; i < this.curves[l].length; i++) {
         // Move path points
         this.path[l][i].x += diffX;
         this.path[l][i].y += diffY;
 
         // Move curve points
-        tmpPoints = this.curves[l][i].points;
-        this.curves[l][i].points = [];
-        tmpPoints.forEach((point) => {
-          this.curves[l][i].points.push({ x: point.x + diffX, y: point.y + diffY});
-        });
-        this.curves[l][i].update();
+        for (var j = 0; j < this.curves[l][i].points.length; j++) {
+          this.curves[l][i].points[j].x += diffX;
+          this.curves[l][i].points[j].y += diffY;
+        }
       }
-      //this.generatePolyBezier(l);
     }
   }
 
@@ -171,14 +166,13 @@ class CurveGrinGlass extends BaseGrinGlass {
           }
         ];
       } else {
-        this.path.push([]);
 
         // First point should be on existing lens, so get the closest point on the lens to the mouse
         const startPoint = this.closestPointOnLens(mousePos);
         const startPoint_translated = this.curves[startPoint.indices[0]][startPoint.indices[1]].compute(startPoint.curvePoint.t);
         
         // Handle new module to existing lens set
-        this.path[this.curLens].push({ x: startPoint_translated.x, y: startPoint_translated.y });
+        this.path.push([{ x: startPoint_translated.x, y: startPoint_translated.y }]);
         
         // Ensuring continuity in index management
         //this.curLens = this.path.length;
@@ -208,9 +202,9 @@ class CurveGrinGlass extends BaseGrinGlass {
       }
     }
 
-    // Finishing the lens:
+    // Finishing the lens
     if (this.path[this.curLens].length > 3 || (this.curLens > 0 && this.path[this.curLens].length === 3)) {
-      // Check if clicked on first point
+      // Check if clicked on first point in path of current lens
       if (mouse.snapsOnPoint(this.path[this.curLens][0])) { 
         // Clicked the first point
         this.path[this.curLens].length--;
@@ -224,15 +218,36 @@ class CurveGrinGlass extends BaseGrinGlass {
           isDone: true
         };
       } 
+      // Handle last point being on a curve's path
       // Check for if mouse is inside lens if started outside or if mouse is outside lens if started inside of existing lens
       else if (this.curLens !== 0) {//this.countIntersections(mousePos, this.lensData[this.curLens].parent) !== this.curLensRelations) {
-        var closestCurvePoint = this.closestPointOnLens(mousePos);
+        var closestCurvePoint = null;
+        var pointOnPath = false;
+
+        // Handle last point in path being on an existing path vertex from an existing lens
+        // TODO: optimize how this is handled
+        for (var m = 0; m < this.curves.length; m++) {
+          for (var n = 0; n < this.path[m].length; n++) {
+            if (mouse.snapsOnPoint(this.path[m][n])) {
+              closestCurvePoint = this.path[m][n];
+              pointOnPath = true;
+              this.path[this.curLens].push(closestCurvePoint);
+            }
+          }
+        }
+        // If not on existing path, find closest point on lens to current point
+        if (closestCurvePoint === null) {
+          closestCurvePoint = this.closestPointOnLens(mousePos);
+        }
+          
 
         // Check if the closest point on a curve is actually on a curve. If so, use that curve for the last point(s) on the path/curve
-        if (closestCurvePoint.curvePoint.d ** 2 <= this.intersectTol) {
+        if (pointOnPath || closestCurvePoint.curvePoint.d ** 2 <= this.intersectTol) {
           this.notDone = false;
 
-          this.path[this.curLens].push(this.curves[closestCurvePoint.indices[0]][closestCurvePoint.indices[1]].compute(closestCurvePoint.curvePoint.t));
+          if (!pointOnPath) {
+            this.path[this.curLens].push(this.curves[closestCurvePoint.indices[0]][closestCurvePoint.indices[1]].compute(closestCurvePoint.curvePoint.t));
+          }
           this.lensData[this.curLens].endPoint = closestCurvePoint;
           this.lensData[this.curLens].bounds = {
             type: "dependent", 
@@ -455,7 +470,9 @@ class CurveGrinGlass extends BaseGrinGlass {
           dragContext.targetPoint = this.curves[l][targetPoint_index].points[targetPoint_subindex];
           dragContext.lens = l;
           return dragContext;
-        } else {
+        } 
+        // On a path point
+        else {
           dragContext.part = 1;
           dragContext.index = targetPoint_index;
           dragContext.targetPoint = this.path[l][targetPoint_index];
@@ -463,6 +480,7 @@ class CurveGrinGlass extends BaseGrinGlass {
           return dragContext;
         }
       }
+      // On the curve itself
       for (var i = 0; i < this.curves[l].length; i++) {
         if (mouse.isOnCurve(geometry.curve(this.curves[l][i].points))) {
           // Dragging the entire this
@@ -472,6 +490,7 @@ class CurveGrinGlass extends BaseGrinGlass {
           dragContext.snapContext = {};*/
           dragContext.part = 0;
           dragContext.lens = l;
+          dragContext.index = i;
           return dragContext;
         }
       }
@@ -490,30 +509,57 @@ class CurveGrinGlass extends BaseGrinGlass {
       mod += 2;
     }
 
+    // Handle creation of new lens
+    if (mod === 3) {
+      this.curLens++;
+      this.onConstructMouseDown(mouse, false, false);
+      return;
+    }
+
     if (dragContext.part === 1) {
       switch (mod) {
+        // Default behavior (no movement restrictions)
         default:
           mousePos = mouse.getPosSnappedToGrid();
           dragContext.snapContext = {}; // Unlock the dragging direction when the user release the shift key
           break;
-        case 1, 3:
+
+        // Snapping to a direction
+        case 1://, 3:
           mousePos = mouse.getPosSnappedToDirection(dragContext.mousePos0, [{ x: 1, y: 0 }, { x: 0, y: 1 }], dragContext.snapContext);
           break;
+
+        // Essentially default movement, but also taking the relevant control points along with the moving path point
         case 2:
-          if (geometry.distanceSquared(this.path[dragContext.lens][(dragContext.index - 1 + this.path[dragContext.lens].length) % this.path[dragContext.lens].length], this.path[dragContext.lens][dragContext.index]) < geometry.distanceSquared(this.path[dragContext.lens][(dragContext.index + 1) % this.path[dragContext.lens].length], this.path[dragContext.lens][dragContext.index])) {
+          mousePos = mouse.getPosSnappedToGrid();
+          dragContext.snapContext = {}; // Unlock the dragging direction when the user release the shift key
+
+          // Get the difference in position between mouse and path point being moved to figure out how we want to translate the control points
+          var diffX = mousePos.x - this.curves[dragContext.lens][dragContext.index].points[0].x;
+          var diffY = mousePos.y - this.curves[dragContext.lens][dragContext.index].points[0].y;
+
+          // First control point of the latter curve
+          this.curves[dragContext.lens][dragContext.index].points[1].x += diffX; 
+          this.curves[dragContext.lens][dragContext.index].points[1].y += diffY; 
+          // Second control point of the former curve
+          this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].points[2].x += diffX;
+          this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].points[2].y += diffY;
+          
+          /*if (geometry.distanceSquared(this.path[dragContext.lens][(dragContext.index - 1 + this.path[dragContext.lens].length) % this.path[dragContext.lens].length], this.path[dragContext.lens][dragContext.index]) < geometry.distanceSquared(this.path[dragContext.lens][(dragContext.index + 1) % this.path[dragContext.lens].length], this.path[dragContext.lens][dragContext.index])) {
             closest = this.path[dragContext.lens][(dragContext.index - 1 + this.path[dragContext.lens].length) % this.path[dragContext.lens].length];
           } else {
             closest = this.path[dragContext.lens][(dragContext.index + 1) % this.path[dragContext.lens].length];
           }
           mousePos = mouse.getPosSnappedToDirection(geometry.point(closest.x, closest.y), [{ x: 1, y: 0 }, { x: 0, y: 1 }], dragContext.snapContext);
-          break;
+          */
+         break;
       }
+      // Move path points
       this.path[dragContext.lens][dragContext.index].x = mousePos.x;
       this.path[dragContext.lens][dragContext.index].y = mousePos.y;
+      // Move the associated point on the current curve and the previous curve
       this.curves[dragContext.lens][dragContext.index].points[0] = geometry.point(mousePos.x, mousePos.y);
       this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].points[3] = geometry.point(mousePos.x, mousePos.y);
-      this.curves[dragContext.lens][dragContext.index % this.curves[dragContext.lens].length].update();
-      this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].update();
     }
 
     else if (dragContext.part === 2 || dragContext.part === 3) {
@@ -548,11 +594,6 @@ class CurveGrinGlass extends BaseGrinGlass {
       } else {
         mousePos = mouse.getPosSnappedToGrid();
         dragContext.snapContext = {}; // Unlock the dragging direction when the user release the shift key
-      }
-      if (ctrl) {
-        this.curLens++;
-        this.onConstructMouseDown(mouse, false, false);
-        return;
       }
       this.move(mousePos.x - dragContext.mousePos1.x, mousePos.y - dragContext.mousePos1.y);
       dragContext.mousePos1 = mousePos;
