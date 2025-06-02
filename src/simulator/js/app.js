@@ -38,6 +38,7 @@ import * as sceneObjs from './sceneObjs.js';
 import { saveAs } from 'file-saver';
 import i18next, { t, use } from 'i18next';
 import HttpBackend from 'i18next-http-backend';
+import Mouse from './Mouse.js';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -462,6 +463,26 @@ async function startApp() {
     if ((e.ctrlKey || e.metaKey) && e.keyCode == 79) {
       document.getElementById('open').onclick();
       return false;
+    }
+
+    //N (for use in creation of composite lenses)
+    if ((e.keyCode == 78)) {
+      console.log("N KEY PRESSED");
+      if (editor.selectedObjIndex != -1) {
+        console.log("OBJECT INDEX: " + editor.selectedObjIndex);
+        var selectedObj = scene.objs[editor.selectedObjIndex];
+        console.log("SELECTED OBJECT CONSTRUCTOR TYPE: " + selectedObj.constructor.type);
+        // If it's an instance of CurveGrinGlass, start making a new lens as part of a composite lens.
+        // Also check if construction is done, so that users can't create new composite lenses before the initial lens is completed first.
+        // TODO: Add support for other types of lenses, e.g. CustomGlass
+        if (selectedObj.constructor.type === "CurveGrinGlass" && selectedObj.notDone === false) {// && selectedObj.curLens !== 0) {
+          // Iterate current lens
+          selectedObj.curLens++;
+          console.log("CURRENT LENS: " + selectedObj.curLens)
+          // Create new lens by emulating a mouse click in construct mode to begin construct mode on the new lens
+          selectedObj.onConstructMouseDown(new Mouse(e.mousePos, scene, false), e.ctrlKey, e.shiftKey);
+        }
+      }
     }
 
     //esc
