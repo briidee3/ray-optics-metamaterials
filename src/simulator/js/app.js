@@ -468,6 +468,7 @@ async function startApp() {
     //N (for use in creation of composite lenses)
     if ((e.keyCode == 78)) {
       console.log("N KEY PRESSED");
+      console.log(e.mouse);
       if (editor.selectedObjIndex != -1) {
         console.log("OBJECT INDEX: " + editor.selectedObjIndex);
         var selectedObj = scene.objs[editor.selectedObjIndex];
@@ -479,8 +480,14 @@ async function startApp() {
           // Iterate current lens
           selectedObj.curLens++;
           console.log("CURRENT LENS: " + selectedObj.curLens)
+          
+          // Get the mouse position from DOM
+          // Note: try to find a better way to do this
+          var mousePos = document.getElementById('mouseCoordinates').innerHTML.match(/-?\d+(.\d+)?/g);
+          mousePos = { x: Number(mousePos[0]), y: Number(mousePos[1]) };
+
           // Create new lens by emulating a mouse click in construct mode to begin construct mode on the new lens
-          selectedObj.onConstructMouseDown(new Mouse(e.mousePos, scene, false), e.ctrlKey, e.shiftKey);
+          selectedObj.onConstructMouseDown(new Mouse(mousePos, scene, false), e.ctrlKey, e.shiftKey);
         }
       }
     }
