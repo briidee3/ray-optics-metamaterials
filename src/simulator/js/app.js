@@ -478,7 +478,6 @@ async function startApp() {
         // TODO: Add support for other types of lenses, e.g. CustomGlass
         if (selectedObj.constructor.type === "CurveGrinGlass" && selectedObj.notDone === false) {// && selectedObj.curLens !== 0) {
           // Iterate current lens
-          selectedObj.curLens++;
           console.log("CURRENT LENS: " + selectedObj.curLens)
           
           // Get the mouse position from DOM

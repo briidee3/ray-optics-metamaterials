@@ -52,7 +52,7 @@ class CurveGrinGlass extends BaseGrinGlass {
     stepSize: 1,
     intersectTol: 0.05, // Tolerance is 1/20 of a pixel
     rayLen: 0.001,
-    curLens: 0, // Index of current lens being drawn
+    curLens: -1, // Index of current lens being drawn
   };
   
   populateObjBar(objBar) {
@@ -73,7 +73,9 @@ class CurveGrinGlass extends BaseGrinGlass {
           ctx.moveTo(this.path[l][0].x, this.path[l][0].y);
 
           for (var i = 0; i < this.path[l].length; i++) {
+            console.log("In draw: " + this.curves[0][0] instanceof Bezier);
             this.drawCurve(this.curves[l][i], this.path[l][i], canvasRenderer);
+            console.log("Post draw: " + this.curves[0][0] instanceof Bezier);
             //this.drawCurve(this.curves[i], this.path[l][i], canvasRenderer);
             //ctx.bezierCurveTo(this.controlPoints[i].x, this.controlPoints[i].y, this.controlPoints[(i + 1)].x, this.controlPoints[(i + 1)].y, this.path[l][(i + 1)].x, this.path[l][(i + 1)].y);
             //ctx.lineTo(this.path[l][(i + 1) % this.path[l].length].x, this.path[l][(i + 1) % this.path[l].length].y);
@@ -141,7 +143,8 @@ class CurveGrinGlass extends BaseGrinGlass {
           this.curves[l][i].points[j].x += diffX;
           this.curves[l][i].points[j].y += diffY;
         }
-        this.curves[l][i].update();
+        //this.curves[l][i].update();
+        this.curves[l][i] = new Bezier(this.curves[l][i].points);
       }
     }
   }
@@ -150,6 +153,7 @@ class CurveGrinGlass extends BaseGrinGlass {
     const mousePos = mouse.getPosSnappedToGrid();
     if (!this.notDone) {
       // Initialize the construction stage
+      this.curLens++;
       this.notDone = true;
       // Initialize new lens set
       if (this.curLens === 0) {
@@ -180,7 +184,7 @@ class CurveGrinGlass extends BaseGrinGlass {
         this.path.push([{ x: startPoint_translated.x, y: startPoint_translated.y }]);
         
         // Ensuring continuity in index management
-        //this.curLens = this.path.length;
+        this.curLens = this.path.length - 1;
 
         // Add to lens data that this is part of a composite lens
         this.lensData.push({ 
@@ -204,7 +208,6 @@ class CurveGrinGlass extends BaseGrinGlass {
           index: 0,
           t: startPoint.curvePoint.t
         });*/
-        return;
       }
     }
 
@@ -220,6 +223,7 @@ class CurveGrinGlass extends BaseGrinGlass {
         };
 
         this.generatePolyBezier(this.curLens);
+        console.log(this.curves[0][0] instanceof Bezier);
         return {
           isDone: true
         };
@@ -227,6 +231,7 @@ class CurveGrinGlass extends BaseGrinGlass {
       // Handle last point being on a curve's path
       // Check for if mouse is inside lens if started outside or if mouse is outside lens if started inside of existing lens
       else if (this.curLens !== 0) {//this.countIntersections(mousePos, this.lensData[this.curLens].parent) !== this.curLensRelations) {
+        console.log(this.curves[0][0] instanceof Bezier);
         var closestCurvePoint = null;
         var pointOnPath = false;
 
@@ -243,7 +248,7 @@ class CurveGrinGlass extends BaseGrinGlass {
         }
         // If not on existing path, find closest point on lens to current point
         if (!pointOnPath) {
-          closestCurvePoint = this.closestPointOnLens(mousePos);
+          closestCurvePoint = this.closestPointOnLens({ x: mousePos.x, y: mousePos.y });
         }
           
 
@@ -279,7 +284,7 @@ class CurveGrinGlass extends BaseGrinGlass {
             newLens.push(new Bezier(this.path[this.curLens][i], curCtrlPts[0], curCtrlPts[1], this.path[this.curLens][(i + 1) % this.path[this.curLens].length]));
             //this.drawCurve(this.curves[i], this.path[l][i], canvasRenderer);
           }
-          const lenExisting = this.curves[this.curLens].length;
+          const lenExisting = this.curves[this.lensData[this.lensData.length].parent].length;
 
           // Add the part of the lens that is concurrent with the curve the starting point is on
           if (this.lensData[this.curLens].startPoint.indices[0] === this.lensData[this.curLens].endPoint.indices[0]) {  // Start and end points on same lens
@@ -415,8 +420,15 @@ class CurveGrinGlass extends BaseGrinGlass {
       }
     }
 
+    if (this.curLens > 0) {
+      console.log("before:" + this.curves[0][0] instanceof Bezier);
+    }
     // Create a new point if continuing lens creation
     this.path[this.curLens].push({ x: mousePos.x, y: mousePos.y });
+
+    if (this.curLens > 0) {
+      console.log("after:" + this.curves[0][0] instanceof Bezier);
+    }
 
     // Keep track of if lens is inside or outside of another lens, for use making lens sets
     /*if (this.curLens !== 0 && this.path[this.curLens].length === 1) {
@@ -562,8 +574,11 @@ class CurveGrinGlass extends BaseGrinGlass {
           mousePos = mouse.getPosSnappedToDirection(geometry.point(closest.x, closest.y), [{ x: 1, y: 0 }, { x: 0, y: 1 }], dragContext.snapContext);
           */
 
-          this.curves[dragContext.lens][dragContext.index].update();
-          this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].update();
+          //this.curves[dragContext.lens][dragContext.index].update();
+          //this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].update();
+
+          this.curves[dragContext.lens][dragContext.index] = new Bezier(this.curves[dragContext.lens][dragContext.index].points);
+          this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length] = new Bezier(this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].points);
 
          break;
       }
@@ -571,11 +586,17 @@ class CurveGrinGlass extends BaseGrinGlass {
       this.path[dragContext.lens][dragContext.index].x = mousePos.x;
       this.path[dragContext.lens][dragContext.index].y = mousePos.y;
       // Move the associated point on the current curve and the previous curve
-      this.curves[dragContext.lens][dragContext.index].points[0] = geometry.point(mousePos.x, mousePos.y);
-      this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].points[3] = geometry.point(mousePos.x, mousePos.y);
+      this.curves[dragContext.lens][dragContext.index].points[0].x = mousePos.x;
+      this.curves[dragContext.lens][dragContext.index].points[0].y = mousePos.y;
+      this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].points[3].x = mousePos.x;
+      this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].points[3].y = mousePos.y;
 
-      this.curves[dragContext.lens][dragContext.index].update();
-      this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].update();
+      //this.curves[dragContext.lens][dragContext.index].update();
+      //this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].update();
+
+      this.curves[dragContext.lens][dragContext.index] = new Bezier(this.curves[dragContext.lens][dragContext.index].points);
+      this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length] = new Bezier(this.curves[dragContext.lens][(dragContext.index - 1 + this.curves[dragContext.lens].length) % this.curves[dragContext.lens].length].points);
+
     }
 
     else if (dragContext.part === 2 || dragContext.part === 3) {
@@ -585,19 +606,37 @@ class CurveGrinGlass extends BaseGrinGlass {
         mousePos = mouse.getPosSnappedToGrid();
         dragContext.snapContext = {}; // Unlock the dragging direction when the user release the shift key
       }
-      this.curves[dragContext.lens][dragContext.index].points[dragContext.part - 1] = geometry.point(mousePos.x, mousePos.y);
-      this.curves[dragContext.lens][dragContext.index].update();
+      this.curves[dragContext.lens][dragContext.index].points[dragContext.part - 1].x = mousePos.x;
+      this.curves[dragContext.lens][dragContext.index].points[dragContext.part - 1].y = mousePos.y;
+      //this.curves[dragContext.lens][dragContext.index].update();
+
+      this.curves[dragContext.lens][dragContext.index] = new Bezier(this.curves[dragContext.lens][dragContext.index].points);
+
       
       // Also handle any potential dependent curves
       if (Object.hasOwn(this.dependentVertices, dragContext.lens)) {
         if (Object.hasOwn(this.dependentVertices[dragContext.lens], dragContext.index)) {
           this.dependentVertices[dragContext.lens][dragContext.index].forEach((point) => {
-            var tmp_curve = this.curves[point.lens][point.index].points;
+            var tmp_point = this.curves[dragContext.lens][dragContext.index].compute(point.t);
             if (point.type === "end") {
-              this.curves[point.lens][point.index].points[3] = this.curves[dragContext.lens][dragContext.index].compute(point.t);
+              //this.curves[point.lens][point.index].points[3].x = tmp_point.x;
+              //this.curves[point.lens][point.index].points[3].y = tmp_point.y;
+              this.curves[point.lens][point.index] = new Bezier(
+                this.curves[point.lens][point.index].points[0],
+                this.curves[point.lens][point.index].points[1],
+                this.curves[point.lens][point.index].points[2],
+                { x: tmp_point.x, y: tmp_point.y }
+              );
             } else {
               // If not end point, assume start point
-              this.curves[point.lens][point.index].points[0] = this.curves[dragContext.lens][dragContext.index].compute(point.t);
+              //this.curves[point.lens][point.index].points[0].x = tmp_point.x;
+              //this.curves[point.lens][point.index].points[0].y = tmp_point.y;
+              this.curves[point.lens][point.index] = new Bezier(
+                { x: tmp_point.x, y: tmp_point.y },
+                this.curves[point.lens][point.index].points[1],
+                this.curves[point.lens][point.index].points[2],
+                this.curves[point.lens][point.index].points[3]
+              );
             }
             this.curves[point.lens][point.index].update();
           });
@@ -1149,21 +1188,28 @@ class CurveGrinGlass extends BaseGrinGlass {
   closestPointOnLens(p1) {
     console.log(this.curves);
     console.log(this.curves[0][0]);
-    console.log(this.curves[0][0].constructor.type);
+    console.log(this.curves[0][0] instanceof Bezier);
     var closestCurvePoint = this.curves[0][0].project(p1);
     var closestCurvePoint_tmp;
     var closestCurvePoint_indices = [0, 0];
     console.log("NUM LENSES: " + this.curves.length);
     console.log("NUM CURVES IN FIRST LENS: " + this.curves[0].length);
+    console.log(this.curves[0][0] instanceof Bezier);
 
     // Push the point on the nearest curve which is closest to the current point
     for (var l = 0; l < this.curves.length; l++) {
+      console.log(this.curves[0][0] instanceof Bezier);
+      console.log(this.curves[l][0] instanceof Bezier);
       for (var i = 0; i < this.curves[l].length; i++) {
+        console.log(i);
+        console.log("In draw: " + this.curves[l][i] instanceof Bezier);
+        console.log(this.curves[l][i]);
         closestCurvePoint_tmp = this.curves[l][i].project(p1);
-        if (closestCurvePoint_tmp.d < closestCurvePoint.d) {
+        if (closestCurvePoint_tmp.d <= closestCurvePoint.d) {
           closestCurvePoint = closestCurvePoint_tmp;
           closestCurvePoint_indices = [l, i];
         }
+        console.log("In draw: " + this.curves[l][i] instanceof Bezier);
       }
     }
 
