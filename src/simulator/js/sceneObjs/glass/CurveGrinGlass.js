@@ -1157,7 +1157,7 @@ class CurveGrinGlass extends BaseGrinGlass {
     const cpVec1 = geometry.normalize(geometry.point(pts[2].x - pts[0].x, pts[2].y - pts[0].y));
     const cpVec2 = geometry.normalize(geometry.point(pts[3].x - pts[1].x, pts[3].y - pts[1].y));
 
-    return [ geometry.point(pts[1].x + cpVec1.x * 50, pts[1].y + cpVec1.y * 50), geometry.point(pts[2].x - cpVec2.x * 50, pts[2].y - cpVec2.y * 50) ];
+    return [ geometry.point(pts[1].x + Math.floor(cpVec1.x * 50 + 0.5), pts[1].y + Math.floor(cpVec1.y * 50 + 0.5)), geometry.point(pts[2].x - Math.floor(cpVec2.x * 50 + 0.5), pts[2].y - Math.floor(cpVec2.y * 50 + 0.5)) ];
   }
 
   // Generate Poly Bezier (i.e. set of Bezier curves which will form the boundaries of the lens) from path
