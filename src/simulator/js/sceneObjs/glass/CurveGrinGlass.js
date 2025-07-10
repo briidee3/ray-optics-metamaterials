@@ -44,18 +44,85 @@ class CurveGrinGlass extends BaseGrinGlass {
   static isOptical = true;
   static supportsSurfaceMerging = true;
   static serializableDefaults = {
-    curves: [],
-    path: [],
-    lensData: [], // Hold data on different lenses in composite lens
-    dependentVertices: {}, // Keep track of points on curves which are shared between multiple lenses
-    notDone: false,
+    lensData: [], // (WIP) Hold data on different lenses in composite lens
+    dependentVertices: {}, // (WIP) Keep track of points on curves which are shared between multiple lenses
+    points: [],
     refIndexFn: '1.1+0.1\\cdot\\cos\\left(0.1\\cdot y\\right)',
     origin: { x: 0, y: 0 },
     stepSize: 1,
-    intersectTol: 0.05, // Tolerance is 1/20 of a pixel
-    rayLen: 0.001,
-    curLens: -1, // Index of current lens being drawn
+    intersectTol: 0.05   // Tolerance is 1/20 of a pixel (found empirically during testing of curved lenses)
   };
+
+  /**
+   * @param {Scene} scene - The scene the object belongs to.
+   * @param {Object|null} jsonObj - The JSON object to be deserialized, if any.
+   */
+  constructor(scene, jsonObj) {
+    super(scene, jsonObj);
+
+    // Reset curLens to account for potential unfinished lenses
+    this.curLens = -1;
+
+    // Initialize curves and path
+    this.curves = [];
+    this.path = [];
+
+    console.log("CONSTRUCTOR CALLED: ");
+    console.log(jsonObj);
+
+    // Extrapolate the (unoptimized) object from the (optimized) JSON object.
+    // NOTE: The "curves" and "path" properties should eventually be combined and optimized to be consistent with the JSON representation.
+    if (jsonObj.points) {
+      // Go through each of the lenses in points
+      for (let curLens = 0; curLens < jsonObj.points.length; curLens++) {
+        // Add new lens to curves and path
+        this.curves.push([]);
+        this.path.push([]);
+
+        // Go through each of the curves in the current lens
+        for (let curCurve = 0; curCurve < jsonObj.points[curLens].length; curCurve++) {
+          // The first point is the first anchor point, the second two control points, and the first of the next curve the last anchor point
+          this.path[curLens].push(jsonObj.points[curLens][curCurve][0]);
+          this.curves[curLens].push(new Bezier(
+            jsonObj.points[curLens][curCurve][0], 
+            jsonObj.points[curLens][curCurve][1], 
+            jsonObj.points[curLens][curCurve][2], 
+            jsonObj.points[curLens][(curCurve + 1) % jsonObj.points[curLens].length][0], 
+          ));
+        }
+        this.curLens++;
+      }
+    } 
+  }
+
+  /**
+   * Serializes the object to a JSON object.
+   * @returns {Object} The serialized JSON object.
+   */
+  serialize() {
+    let jsonObj = super.serialize();
+
+    // Remove redundant properties of the JSON representation of the object.
+    if (this.curves && this.path) {
+      // For each lens in modular/composite lens
+      console.log("Initial: " + JSON.stringify(jsonObj));
+      jsonObj.points = this.curves.map(lens => {
+        // The first three points of each curve is all that is necessary to recreate each curved lens
+        return lens.map(curve => {
+          // Get the first three points of the curve
+          return JSON.parse(JSON.stringify(curve)).points.slice(0, 3);
+        });
+      });
+    } else {
+      jsonObj.points = [[]];  // Empty
+    }
+    delete jsonObj.curves;
+    delete jsonObj.path;
+
+    console.log("Final: " + JSON.stringify(jsonObj));
+
+    return jsonObj;
+  }
   
   populateObjBar(objBar) {
     objBar.setTitle(i18next.t('main:tools.CurveGrinGlass.title'));
