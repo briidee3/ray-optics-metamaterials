@@ -279,14 +279,15 @@ class CurveGrinGlass extends BaseGrinGlass {
           var curCtrlPts;
           // Create one curve for each line
           for (var i = 0; i < this.path[this.curLens].length; i++) {
-            //curCtrlPts = this.generateDefaultControlPoints([ this.path[this.curLens][(i - 1 + this.path[this.curLens].length) % this.path[this.curLens].length], this.path[this.curLens][i], this.path[this.curLens][(i + 1) % this.path[this.curLens].length], this.path[this.curLens][(i + 2) % this.path[this.curLens].length] ]);
-            curCtrlPts = this.generateDefaultControlPoints([ this.path[l][(i - 1 + this.path[l].length) % this.path[l].length], this.path[l][i], this.path[l][(i + 1) % this.path[l].length], this.path[l][(i + 2) % this.path[l].length] ]);
+            curCtrlPts = this.generateDefaultControlPoints([ this.path[this.curLens][(i - 1 + this.path[this.curLens].length) % this.path[this.curLens].length], this.path[this.curLens][i], this.path[this.curLens][(i + 1) % this.path[this.curLens].length], this.path[this.curLens][(i + 2) % this.path[this.curLens].length] ]);
+            //curCtrlPts = this.generateDefaultControlPoints([ this.path[l][(i - 1 + this.path[l].length) % this.path[l].length], this.path[l][i], this.path[l][(i + 1) % this.path[l].length], this.path[l][(i + 2) % this.path[l].length] ]);
             newLens.push(new Bezier(this.path[this.curLens][i], curCtrlPts[0], curCtrlPts[1], this.path[this.curLens][(i + 1) % this.path[this.curLens].length]));
             //this.drawCurve(this.curves[i], this.path[l][i], canvasRenderer);
           }
           const lenExisting = this.curves[this.lensData[this.lensData.length].parent].length;
 
           // Add the part of the lens that is concurrent with the curve the starting point is on
+          // TODO: Split the existing curve in two instead of doing things as they are now, and have one shared curve, updating dependentVertices accordingly
           if (this.lensData[this.curLens].startPoint.indices[0] === this.lensData[this.curLens].endPoint.indices[0]) {  // Start and end points on same lens
             if (this.lensData[this.curLens].startPoint.indices[0] === this.lensData[this.curLens].endPoint.indices[0]) {  // Start and end points on same curve
               newLens.push(
