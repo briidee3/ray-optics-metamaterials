@@ -55,7 +55,7 @@
 <script>
 /**
  * @module Toolbar
- * @description The Vue component for the toolbar (which contains both the desktop and mobile parts). Note that many UI code in this component has not been refactored using a proper Vue approach.
+ * @description The Vue component for the toolbar (which contains both the desktop and mobile parts). It is mixed-paradigm code that combines Vue and vanilla JavaScript due to historical reasons.
  */
 import FileBar from './FileBar.vue';
 import ToolsBar from './ToolsBar.vue';
@@ -313,13 +313,17 @@ export default {
 }
 
 #mobile-dropdown-options .row {
-  padding-top: 3px;
-  padding-bottom: 3px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 #mobile-dropdown-options .form-check-input {
   height: 1.2em;
   width: 2.4em;
+}
+
+.settings-control-row {
+  min-height: 30px;
 }
 
 

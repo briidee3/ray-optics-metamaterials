@@ -31,7 +31,6 @@ import * as math from 'mathjs';
 
 /**
  * The class for a module object.
- * This feature is experimental and may be changed in the future without backward compatibility.
  * Currently, there is no UI for creating a module object. You can create a module object by directly editing the JSON data of the scene.
  * @class
  * @memberof sceneObjs
@@ -650,7 +649,8 @@ class ModuleObj extends BaseSceneObj {
     let result = [];
     for (let obj of arr) {
       try {
-        if ('for' in obj) {
+        const isPlainObject = typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+        if (isPlainObject && 'for' in obj) {
           let forObj = obj['for'];
           let loopVars = [];
           if (typeof forObj === 'string') {
@@ -698,7 +698,7 @@ class ModuleObj extends BaseSceneObj {
             }
           }
 
-        } else if ('if' in obj) {
+        } else if (isPlainObject && 'if' in obj) {
           if (math.evaluate(obj['if'], params)) {
             result.push(this.expandObject(obj, params));
           }
@@ -706,7 +706,7 @@ class ModuleObj extends BaseSceneObj {
           result.push(this.expandString(obj, params));
         } else if (Array.isArray(obj)) {
           result.push(this.expandArray(obj, params));
-        } else if (typeof obj === 'object') {
+        } else if (isPlainObject) {
           result.push(this.expandObject(obj, params));
         } else {
           result.push(obj);

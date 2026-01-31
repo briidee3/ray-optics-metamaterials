@@ -8,10 +8,10 @@
     "saveButton": "Sauvegarder",
     "cancelButton": "Annuler",
     "defaultOption": "Par défaut",
-    "closeButton": "Fermer",
-    "reloadToTakeEffect": "Rechargez la page pour que la modification s'applique.",
     "customOption": "Personnalisé",
-    "resetButton": "Réinitialiser"
+    "closeButton": "Fermer",
+    "resetButton": "Réinitialiser",
+    "reloadToTakeEffect": "Rechargez la page pour que la modification s'applique."
   },
   "file": {
     "title": "Fichier",
@@ -51,10 +51,10 @@
       "description": "Détermine le nombre de rayons que doivent émettre les faisceaux et les sources ponctuelles.Affecte aussi la précision de la détection d'image et le rendu des couleurs."
     },
     "layoutAids": {
+      "title": "Aide à la mise en page",
       "showGrid": "Grille",
       "snapToGrid": "Attacher à la grille",
-      "lockObjs": "Verrouiller les objets",
-      "title": "Aide à la mise en page"
+      "lockObjs": "Verrouiller les objets"
     },
     "showRayArrows": {
       "title": "Afficher les flèches directrices de la lumière"
@@ -76,18 +76,18 @@
     "zoom": {
       "title": "Zoom"
     },
+    "showAdvancedSettings": {
+      "title": "Plus de paramètres de scène…"
+    },
+    "theme": {
+      "title": "Thème"
+    },
     "colorMode": {
       "title": "Mode Couleur",
       "description": "Détermine comment la luminosité (et les couleurs si \"Simuler les couleurs\" est activé) du rayon ou des images sont associé aux couleur sur l'écran. Seulement configurable quand \"Correct Brightness\" est utilisé."
     },
     "language": {
       "title": "Langue"
-    },
-    "showAdvancedSettings": {
-      "title": "Plus de paramètres de scène…"
-    },
-    "theme": {
-      "title": "Thème"
     }
   },
   "objBar": {
@@ -138,8 +138,7 @@
         "description": "Quand vous déplacez un objet, maintenez l'appui sur Majuscule pour contraindre le mouvement sur la verticale/horizontale ; maintenez Ctrl pour cloner. Quand vous créez un objet linéaire ou glissez ses extrémités, appuyez sur Majuscule pour verrouiller l'angle sur 0°, 45°, 90° ; appuyez sur Ctrl pour tourner ou mettre à l'échelle par rapport à son milieu."
       },
       "groupRotateScale": {
-        "title": "Grouper, tourner et mettre des objets à l'échelle",
-        "description": "Maintenez Ctrl, appuyez sur plusieurs points de contrôle comme des extrémités [or click one or more objects], puis appuyez sur un espace vide pour grouper ces points et créer une poignée. Glissez la poignée (ou utilisez les flèches du clavier) pour déplacer le groupe ; Majuscule+glisser pour contraindre sur la verticale/horizontale ; Ctrl+glisser pour tourner le groupe, Ctr+Maj+glisser pour mettre le groupe à l'échelle. Glissez le \"+\" pour ajuster le centre de rotation/mise à l'échelle. Cliquer sur la poignez et appuyez sur Ctrl+D pour dupliquer le groupe ; pressez sur Suppr pour dégrouper."
+        "title": "Grouper, tourner et mettre des objets à l'échelle"
       },
       "editCoordinates": {
         "title": "Éditer directement les coordonnées",

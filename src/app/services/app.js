@@ -16,7 +16,7 @@
 
 /**
  * @module app
- * @description The main app "service". Many parts of the app are not fully refactored to a proper Vue approach yet, so some mixed-paradigm code exists in this file.
+ * @description The main app service. It is mixed-paradigm code that combines Vue and vanilla JavaScript due to historical reasons.
  */
 
 import * as bootstrap from 'bootstrap';
@@ -195,11 +195,11 @@ function initAppService() {
 
 
   editor.on('positioningStart', function (e) {
-    document.getElementById('xybox').style.left = (e.dragContext.targetPoint.x * scene.scale + scene.origin.x) + 'px';
-    document.getElementById('xybox').style.top = (e.dragContext.targetPoint.y * scene.scale + scene.origin.y) + 'px';
+    document.getElementById('xybox-container').style.left = (e.dragContext.targetPoint.x * scene.scale + scene.origin.x) + 'px';
+    document.getElementById('xybox-container').style.top = (e.dragContext.targetPoint.y * scene.scale + scene.origin.y) + 'px';
     document.getElementById('xybox').value = '(' + (e.dragContext.targetPoint.x) + ',' + (e.dragContext.targetPoint.y) + ')';
     document.getElementById('xybox').size = document.getElementById('xybox').value.length;
-    document.getElementById('xybox').style.display = '';
+    document.getElementById('xybox-container').style.display = '';
     document.getElementById('xybox').select();
     document.getElementById('xybox').setSelectionRange(1, document.getElementById('xybox').value.length - 1);
     xyBox_cancelContextMenu = true;
@@ -210,7 +210,113 @@ function initAppService() {
   });
 
   editor.on('positioningEnd', function (e) {
-    document.getElementById('xybox').style.display = 'none';
+    document.getElementById('xybox-container').style.display = 'none';
+    // Hide the xybox info popover if it's open
+    const xyboxInfoIcon = document.querySelector('.xybox-info-icon');
+    if (xyboxInfoIcon && xyboxInfoIcon._popover) {
+      xyboxInfoIcon._popover.hide();
+    }
+  });
+
+  // Store the popover instance for object body hint
+  let objectBodyHintPopover = null;
+
+  editor.on('objectBodyClick', function (e) {
+    // Only show hint if help popovers are enabled
+    if (!window.popoversEnabled) return;
+
+    const anchor = document.getElementById('object-body-hint-anchor');
+    let content = '';
+    
+    // Dispose existing popover if any
+    if (objectBodyHintPopover) {
+      objectBodyHintPopover.dispose();
+      objectBodyHintPopover = null;
+    }
+
+    // Position the anchor at the click location
+    anchor.style.left = e.screenPos.x + 'px';
+    anchor.style.top = e.screenPos.y + 'px';
+    anchor.style.display = '';
+
+    // If the target object is a handle, show the handle arrow hint
+    if (scene.objs[e.targetObjIndex] && scene.objs[e.targetObjIndex].constructor.type == "Handle") {
+      content = i18next.t('simulator:editor.handleArrowHint');
+    } else {
+      content = i18next.t('simulator:editor.objectBodyHint');
+    }
+
+    // Create and show the popover
+    objectBodyHintPopover = new bootstrap.Popover(anchor, {
+      content: content,
+      trigger: 'manual',
+      placement: 'bottom',
+      html: true
+    });
+    objectBodyHintPopover.show();
+
+    // Hide when mouse leaves the anchor area or on touch elsewhere
+    const hidePopover = function () {
+      if (objectBodyHintPopover) {
+        objectBodyHintPopover.dispose();
+        objectBodyHintPopover = null;
+      }
+      anchor.style.display = 'none';
+      anchor.removeEventListener('mouseleave', hidePopover);
+      document.removeEventListener('touchstart', hidePopover);
+    };
+    anchor.addEventListener('mouseleave', hidePopover);
+    document.addEventListener('touchstart', hidePopover);
+  });
+
+  // Store the popover instance for handle creation hint
+  let handleHintPopover = null;
+
+  editor.on('handleCreationHint', function (e) {
+    // Only show hint if help popovers are enabled
+    if (!window.popoversEnabled) return;
+
+    const anchor = document.getElementById('object-body-hint-anchor');
+    
+    // Dispose existing popovers if any
+    if (objectBodyHintPopover) {
+      objectBodyHintPopover.dispose();
+      objectBodyHintPopover = null;
+    }
+    if (handleHintPopover) {
+      handleHintPopover.dispose();
+      handleHintPopover = null;
+    }
+
+    // Position the anchor at the click location
+    anchor.style.left = e.screenPos.x + 'px';
+    anchor.style.top = e.screenPos.y + 'px';
+    anchor.style.display = '';
+
+    // Create and show the popover
+    handleHintPopover = new bootstrap.Popover(anchor, {
+      content: i18next.t('simulator:editor.handleHint'),
+      trigger: 'manual',
+      placement: 'bottom',
+      html: true
+    });
+    handleHintPopover.show();
+
+    // Hide on next click/touch anywhere (not on mouseleave, since user may be dragging)
+    const hidePopover = function () {
+      if (handleHintPopover) {
+        handleHintPopover.dispose();
+        handleHintPopover = null;
+      }
+      anchor.style.display = 'none';
+      document.removeEventListener('mousedown', hidePopover);
+      document.removeEventListener('touchstart', hidePopover);
+    };
+    // Delay adding the listener to avoid immediate dismiss
+    setTimeout(function () {
+      document.addEventListener('mousedown', hidePopover);
+      document.addEventListener('touchstart', hidePopover);
+    }, 100);
   });
 
   editor.on('mouseCoordinateChange', function (e) {
@@ -220,6 +326,14 @@ function initAppService() {
   });
 
   editor.emit('mouseCoordinateChange', { mousePos: null });
+
+  editor.on('deviceChange', function (e) {
+    statusEmitter.emit(STATUS_EVENT_NAMES.DEVICE_CHANGE, { lastDeviceIsTouch: e.lastDeviceIsTouch });
+  });
+
+  editor.on('resetVirtualKeys', function () {
+    statusEmitter.emit(STATUS_EVENT_NAMES.RESET_VIRTUAL_KEYS);
+  });
 
   editor.on('selectionChange', function (e) {
     hideAllPopovers();
@@ -344,7 +458,12 @@ function initAppService() {
     //Ctrl+Z or Cmd+Z
     if ((e.ctrlKey || e.metaKey) && e.keyCode == 90) {
       if (document.getElementById('undo').disabled == false) {
-        editor.undo();
+        if (jsonEditorService.isSynced || !jsonEditorService.aceEditor) {
+          editor.undo();
+        } else {
+          // In this case, the user is editing the JSON and may have done something wrong there, so the user should expect the undo to be done on the JSON editor instead of the visual scene editor. But note that the enabled state of the undo/redo buttons is still determined by the visual scene editor, which is not the best behavior.
+          jsonEditorService.aceEditor.undo();
+        }
       }
       return false;
     }
@@ -366,7 +485,11 @@ function initAppService() {
     //Ctrl+Y or Cmd+Y
     if ((e.ctrlKey || e.metaKey) && e.keyCode == 89) {
       if (document.getElementById('redo').disabled == false) {
-        editor.redo();
+        if (jsonEditorService.isSynced || !jsonEditorService.aceEditor) {
+          editor.redo();
+        } else {
+          jsonEditorService.aceEditor.redo();
+        }
       }
       return false;
     }
@@ -494,7 +617,7 @@ function initAppService() {
     document.dispatchEvent(new Event('sceneChanged'));
     editor.onActionComplete();
     hasUnsavedChange = false;
-    jsonEditorService.updateContent(editor.lastActionJson);
+    jsonEditorService.updateContent(editor.lastActionJson, null, true);
   };
 
   app.getLink = getLink;
@@ -610,6 +733,9 @@ function initAppService() {
 
   // Update the scene when the URL changes
   window.onpopstate = function (event) {
+    if (!jsonEditorService.isSynced) {
+      return; // To prevent accidental data loss if the user hits back button while editing the JSON.
+    }
     if (window.location.hash.length > 70) {
       // The URL contains a compressed JSON scene.
       require('json-url')('lzma').decompress(window.location.hash.substr(1)).then(json => {
@@ -727,7 +853,7 @@ function openSample(name) {
 
     editor.onActionComplete();
     hasUnsavedChange = false;
-    jsonEditorService.updateContent(editor.lastActionJson);
+    jsonEditorService.updateContent(editor.lastActionJson, null, true);
   }
   client.onerror = function () {
     error = "openSample: " + i18next.t('simulator:appErrors.httpError');
@@ -913,7 +1039,7 @@ function openFile(readFile) {
       editor.loadJSON(fileString);
       hasUnsavedChange = false;
       editor.onActionComplete();
-      jsonEditorService.updateContent(editor.lastActionJson);
+      jsonEditorService.updateContent(editor.lastActionJson, null, true);
     } else {
       // Load the background image file
       reader.onload = function (e) {

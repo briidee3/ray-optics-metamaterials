@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Bem-vindo à Simulação de Óptica de Raios",
+    "title": "Bem-vindo à Simulação de Óptica Geométrica",
     "instruction": "Para adicionar um componente ótico, selecione uma ferramenta e clique no espaço vazio.\nPara carregar um exemplo, por favor [visite a página da Galeria](/gallery).",
     "loading": "Carregando cena a partir de URL… Por favor aguarde."
   },
@@ -8,6 +8,7 @@
     "saveButton": "Salvar",
     "cancelButton": "Cancelar",
     "defaultOption": "Padrão",
+    "legacyOption": "Legado",
     "customOption": "Personalizado",
     "closeButton": "Fechar",
     "resetButton": "Reiniciar",
@@ -80,12 +81,12 @@
     "showAdvancedSettings": {
       "title": "Mais configurações da cena…"
     },
+    "theme": {
+      "title": "Tema"
+    },
     "colorMode": {
       "title": "Modo de Cor",
       "description": "Determina como os brilhos (e cores se \"Simular Cores\" estiver ligado) dos raios ou imagens são mapeados a cores na tela. É configurável somente enquanto se utiliza \"Corrigir Brilho\"."
-    },
-    "theme": {
-      "title": "Tema"
     },
     "language": {
       "title": "Linguagem",
@@ -111,7 +112,25 @@
       "title": "Exibir popups de ajuda",
       "description": "Define se vai exibir popups de ajuda quando pairando sobre botões."
     },
-    "advancedHelp": "Para ajuda avançada, veja o ícone de ajuda no canto inferior direito."
+    "advancedHelp": "Para ajuda avançada, veja o ícone de ajuda no canto inferior direito.",
+    "redWavelength": {
+      "title": "Comprimento de onda vermelho (nm)",
+      "description": "O comprimento de onda exibido como vermelho quando \"Simular Cores\" está ligado. Útil para visualizar luz não visível com espectro de cor falsa."
+    },
+    "violetWavelength": {
+      "title": "Comprimento de onda violeta (nm)",
+      "description": "O comprimento de onda exibido como violeta quando \"Simular Cores\" está ligado. Útil para visualizar luz não visível com espectro de cor falsa."
+    },
+    "maxRayDepth": {
+      "title": "Profundidade Máxima de Raio",
+      "description": "Número máximo de interações raio-objeto antes de truncar raios. Use \"inf\" para remover o limite."
+    }
+  },
+  "editor": {
+    "objectBodyHint": "Para rotação, agrupamento, etc., veja o ícone de ajuda no canto inferior direito.",
+    "coordinatesHint": "Para transformar objetos, definir coordenadas a partir de fórmulas, etc., veja o ícone de ajuda no canto inferior direito.",
+    "handleHint": "Para mover múltiplos objetos juntos, clique no espaço vazio para criar um ponto de manuseio.",
+    "handleArrowHint": "Para alternar entre horizontal/vertical/rotação/escala, clique no ponto de manuseio (seta) e mude a opção \"transformação\" acima."
   },
   "objBar": {
     "showAdvanced": {
@@ -144,6 +163,7 @@
       "emisAngle": "Ângulo de Emissão",
       "random": "Aleatório",
       "lambert": "Lambertiano",
+      "coordOrigin": "Origem",
       "focalLength": "Comprimento focal",
       "eqnInfo": {
         "constants": "Constantes suportadas",
@@ -153,7 +173,20 @@
       },
       "imageDetectionWarning": "Esta ferramenta não suporta detecção de imagem.",
       "nonSimulateColorsWarning": "Esta ferramenta só funciona quando \"Simular Cores\" está ligado.",
-      "coordOrigin": "Origem"
+      "lineStyle": "Estilo de linha",
+      "fillStyle": "Estilo de preenchimento",
+      "useThemeStyle": "Usar estilo do tema"
+    },
+    "ParamCurveObjMixin": {
+      "addPiece": "Adicionar segmento",
+      "removePiece": "Remover segmento",
+      "step": "Passo",
+      "error": {
+        "invalidStepSize": "Tamanho de passo inválido: {{step}}",
+        "invalidRange": "Alcance de parâmetros inválido: tMin({{tMin}}) >- tMax ({{tMax}})",
+        "nonFiniteCoords": "Coordenadas não-finitas: ({{x}}, {{y}})",
+        "pieceError": "Erro em segmento {{pieceIndex}}, t={{t}}: {{error}}"
+      }
     },
     "Beam": {
       "imageDetectionWarning": "Detecção de imagem pode não funcionar com raios aleatórios/divergentes."
@@ -178,7 +211,8 @@
         "relative": "Relativo se dentro de outro vidro",
         "effective": "Se este objeto deve ser simulado com índice refrativo absoluto n₁, mas estiver dentro de outro vidro de índice refrativo n₀, então você deve definir o índice refrativo como n₁/n₀ aqui. Em casos mais complicados que vários vidros se sobreponham, o índice refrativo efetivo da região sobreposta é igual ao produto dos índices refrativos individuais."
       },
-      "cauchyCoeff": "Coeficiente de Cauchy"
+      "cauchyCoeff": "Coeficiente de Cauchy",
+      "partialReflect": "Simular reflexões parciais"
     },
     "SphericalLens": {
       "defBy": {
@@ -190,12 +224,24 @@
     "CustomGlass": {
       "curveGenerationError": "Erro de geração de curva: f(x) > g(x) em x={{x}}"
     },
+    "ParamGlass": {
+      "eqnInfo": {
+        "closedAndPositivelyOriented": "A curva deve ser fechada e orientada positivamente (sentido horário na convenção de gráficos de computador onde o eixo y aponta para baixo)."
+      },
+      "warning": {
+        "notClosed": "A curva não está fechada.",
+        "notPositivelyOriented": "A curva não é positivamente orientada."
+      }
+    },
     "BaseGrinGlass": {
       "refIndexFnInfo": {
         "lambda": "Para simular dispersão cromática, use o parâmetro {{lambda}} para o comprimento de onda no vácuo em nanômetros.",
         "diff": "Somente suporta funções diferenciáveis.",
         "origin": "A origem de n(x,y) está em coordenadas absolutas e n~~ao move com o objeto. Você pode clicar duas vezes em um ponto de controle para inspecionar suas coordenadas absolutas.",
         "accuracy": "Para simulação mais precisa, veja \"Mais opções…\""
+      },
+      "absorptionFnInfo": {
+        "absorption": "A taxa de absorção do vidro, em unidades de 1/[comprimento]."
       },
       "stepSize": "Tamanho de passo da solução numérica",
       "stepSizeInfo": "Tamanho de passo do método de Euler para resolver a equação do eikonal de raios - ver função 'step' e documentação dentro do arquivo 'BaseGrinGlass.js', para mais informações.",
@@ -205,9 +251,6 @@
         "all": "Esta opção se aplica a todos objetos GRIN na simulação.",
         "impl": "Este simulador atualmente possi duas implementações de propagação de luz entre meios diferentes, para objetos GRIN - numérica e simbólica (ver funções 'multRefIndex' e 'devRefIndex' em 'BaseGrinGlass.js').",
         "implNote": "A implementação numérica é mais rápida mas nem sempre funciona corretamente (dependende do caso específico) em cenários quando é usada com mais de um objeto GRIN, tal que ao menos um deles possua uma função de índice refrativo que não é definida todo o plano, enquanto a implementação simbólica é mais lenta, mas robusta a esse tipo de problema."
-      },
-      "absorptionFnInfo": {
-        "absorption": "A taxa de absorção do vidro, em unidades de 1/[comprimento]."
       }
     },
     "CircleGrinGlass": {
@@ -220,6 +263,18 @@
       "epsInfo": {
         "units": "Unidades - [comprimento].",
         "functions": "Essa tolerância numérica é usada nas funções 'isOnBoundary' e 'countIntersections', dentro do arquivo'GrinGlass.js'."
+      }
+    },
+    "ParamGrinGlass": {
+      "epsInfo": {
+        "units": "Unidades - [comprimento].",
+        "functions": "Essa tolerância numérica é usada na função 'isOnBoundary' dentro do arquivo 'ParamCurveObjMixin.js'."
+      }
+    },
+    "CurveGrinGlass": {
+      "epsInfo": {
+        "units": "Unidades - [comprimento]^2.",
+        "functions": "Esta tolerância numérica é usada na função 'isOnBoundary' dentro do arquivo 'CurveGrinGlass.js'."
       }
     },
     "Aperture": {
@@ -255,6 +310,9 @@
       "textHere": "Texto Aqui",
       "fontSize": "Tamanho da Fonte",
       "font": "Fonte",
+      "fonts": "Serif: Serifada\nArial: Arial\nHelvetica: Helvetica\nTimes New Roman: Times New Roman\nGeorgia: Georgia\nCourier New: Courier New\nVerdana: Verdana\nTahoma: Tahoma\nTrebuchet MS: Trebuchet MS\nImpact: Impact\nLucida Sans: Lucida Sans",
+      "fontNote": "Se a fonte selecionada não estiver instaladad no seu sistema, uma fonte substituta será usada.",
+      "enterFontName": "Digite nome da fonte…",
       "fontStyle": "Estilo",
       "fontStyles": {
         "normal": "Normal",
@@ -271,10 +329,7 @@
         "right": "Direita"
       },
       "smallCaps": "Maiúsculo pequeno",
-      "angle": "Ângulo",
-      "fonts": "Serif: Serifada\nArial: Arial\nHelvetica: Helvetica\nTimes New Roman: Times New Roman\nGeorgia: Georgia\nCourier New: Courier New\nVerdana: Verdana\nTahoma: Tahoma\nTrebuchet MS: Trebuchet MS\nImpact: Impact\nLucida Sans: Lucida Sans",
-      "fontNote": "Se a fonte selecionada não estiver instaladad no seu sistema, uma fonte substituta será usada.",
-      "enterFontName": "Digite nome da fonte…"
+      "angle": "Ângulo"
     },
     "LineArrow": {
       "arrow": "Seta frontal",
@@ -282,6 +337,35 @@
     },
     "Drawing": {
       "finishDrawing": "Finalizar Desenho"
+    },
+    "BaseCustomSurface": {
+      "info": {
+        "angles": "{{theta_0}} e {{theta_j}} são os ângulos dos raios que incidem e dos j-ésimos raios que saem, respectivamente, em radianos e relativo a direção normal.",
+        "brightnesses": "{{P_0}} e {{P_j}} são os brilhos dos raios incidentes e j-ésimos raios que saem, respectivamente, na mesma unidade que a ferramenta detector usa.",
+        "previousFormulas": "Uma fórmula pode se referir aos resultados de fórmulas anteriores. Se uma fórmula der um valor inválido, o raio que sai é ignorado e seu brilho é tratado como 0.",
+        "otherParams": "Outros parâmetros dos raios incidentes que podem ser usados são {{lambda}} (comprimento de onda em nm) e {{p}} (0 para polarização S, 1 para polarização P). Eles permanecem iguais para os raios que saem.",
+        "coating": "Este objeto pode agir como um revestimento de objetos de vidro ao sobrepor com suas superfícies. Nesse caso, a refração em si também precisa de ser definida pelas fórmulas deste objeto. Os índices refrativos do material associado ao mesmo lado, e ao lado oposto do raio incidente podem ser referidos como {{n_0}} e {{n_1}}, respectivamente. Se este objeto está dentro de um objeto de vidro, os valores são relativos a ele.",
+        "twoSides": "Se você quiser que os dois lados dessa superfície tenham fórmulas diferentes, você pode sobrepor duas superfícies unilaterais com orientações opostas.",
+        "module": "Para ter parâmetros personalizados, fórmulas complexas, ou um grande número de raios de saída, você pode criar um módulo personalizado, Veja Ferramentas -> Outros -> Importar Módulos para mais informação."
+      },
+      "twoSided": "Bilateral",
+      "addOutgoingRay": "Adicionar raio de saída",
+      "removeOutgoingRay": "Remover raio de saída"
+    },
+    "CustomSurface": {
+      "info": {
+        "incidentPos": "A posição do ponto incidente pode ser referida como {{t}}, que interpola linearmente de -1 a 1 entre os dois pontos finais do segmento de linha."
+      }
+    },
+    "CustomArcSurface": {
+      "info": {
+        "incidentPos": "A posição do ponto incidente pode ser referida como {{t}}, que interpola uniformemente (com respeito ao ângulo) de -1 a 1 entre os dois pontos finais do arco."
+      }
+    },
+    "CustomParamSurface": {
+      "info": {
+        "incidentPos": "A posição do ponto incidente no espaço de parâmetros da curva pode ser referido como {{t}}."
+      }
     },
     "ModuleObj": {
       "module": "Módulo",
@@ -316,67 +400,6 @@
       "transparent": "Fundo transparente",
       "svgWarning": "Exportar como SVG: Misturas de cores, brilhos corrigidos, e índices refrativos relativos abaixo de 1 não são suportados.",
       "rayCountWarning": "O número atual de raios na cena é maior que o limite de número de raios. Você pode precisar de aumentar o limite nas opções da Caixa de Corte."
-    },
-    "ParamCurveObjMixin": {
-      "addPiece": "Adicionar segmento",
-      "removePiece": "Remover segmento",
-      "step": "Passo",
-      "error": {
-        "invalidStepSize": "Tamanho de passo inválido: {{step}}",
-        "invalidRange": "Alcance de parâmetros inválido: tMin({{tMin}}) >- tMax ({{tMax}})",
-        "nonFiniteCoords": "Coordenadas não-finitas: ({{x}}, {{y}})",
-        "pieceError": "Erro em segmento {{pieceIndex}}, t={{t}}: {{error}}"
-      }
-    },
-    "ParamGlass": {
-      "eqnInfo": {
-        "closedAndPositivelyOriented": "A curva deve ser fechada e orientada positivamente (sentido horário na convenção de gráficos de computador onde o eixo y aponta para baixo)."
-      },
-      "warning": {
-        "notClosed": "A curva não está fechada.",
-        "notPositivelyOriented": "A curva não é positivamente orientada."
-      }
-    },
-    "ParamGrinGlass": {
-      "epsInfo": {
-        "units": "Unidades - [comprimento].",
-        "functions": "Essa tolerância numérica é usada na função 'isOnBoundary' dentro do arquivo 'ParamCurveObjMixin.js'."
-      }
-    },
-    "BaseCustomSurface": {
-      "info": {
-        "angles": "{{theta_0}} e {{theta_j}} são os ângulos dos raios que incidem e dos j-ésimos raios que saem, respectivamente, em radianos e relativo a direção normal.",
-        "brightnesses": "{{P_0}} e {{P_j}} são os brilhos dos raios incidentes e j-ésimos raios que saem, respectivamente, na mesma unidade que a ferramenta detector usa.",
-        "previousFormulas": "Uma fórmula pode se referir aos resultados de fórmulas anteriores. Se uma fórmula der um valor inválido, o raio que sai é ignorado e seu brilho é tratado como 0.",
-        "otherParams": "Outros parâmetros dos raios incidentes que podem ser usados são {{lambda}} (comprimento de onda em nm) e {{p}} (0 para polarização S, 1 para polarização P). Eles permanecem iguais para os raios que saem.",
-        "twoSides": "Se você quiser que os dois lados dessa superfície tenham fórmulas diferentes, você pode sobrepor duas superfícies unilaterais com orientações opostas.",
-        "module": "Para ter parâmetros personalizados, fórmulas complexas, ou um grande número de raios de saída, você pode criar um módulo personalizado, Veja Ferramentas -> Outros -> Importar Módulos para mais informação.",
-        "coating": "Este objeto pode agir como um revestimento de objetos de vidro ao sobrepor com suas superfícies. Nesse caso, a refração em si também precisa de ser definida pelas fórmulas deste objeto. Os índices refrativos do material associado ao mesmo lado, e ao lado oposto do raio incidente podem ser referidos como {{n_0}} e {{n_1}}, respectivamente. Se este objeto está dentro de um objeto de vidro, os valores são relativos a ele."
-      },
-      "twoSided": "Bilateral",
-      "addOutgoingRay": "Adicionar raio de saída",
-      "removeOutgoingRay": "Remover raio de saída"
-    },
-    "CurveGrinGlass": {
-      "epsInfo": {
-        "units": "Unidades - [comprimento]^2.",
-        "functions": "Esta tolerância numérica é usada na função 'isOnBoundary' dentro do arquivo 'CurveGrinGlass.js'."
-      }
-    },
-    "CustomSurface": {
-      "info": {
-        "incidentPos": "A posição do ponto incidente pode ser referida como {{t}}, que interpola linearmente de -1 a 1 entre os dois pontos finais do segmento de linha."
-      }
-    },
-    "CustomArcSurface": {
-      "info": {
-        "incidentPos": "A posição do ponto incidente pode ser referida como {{t}}, que interpola uniformemente (com respeito ao ângulo) de -1 a 1 entre os dois pontos finais do arco."
-      }
-    },
-    "CustomParamSurface": {
-      "info": {
-        "incidentPos": "A posição do ponto incidente no espaço de parâmetros da curva pode ser referido como {{t}}."
-      }
     }
   },
   "saveModal": {
@@ -505,7 +528,7 @@
       "title": "Superfície do bloqueador"
     },
     "diffractionGrating": {
-      "title": "Superfície da grade de difração"
+      "title": "Superfície da rede de difração"
     },
     "detector": {
       "title": "Superfície do detector"
@@ -529,18 +552,18 @@
       "title": "Estilo da decoração"
     },
     "handlePoint": {
-      "title": "Ponto de manuseio padrão"
+      "title": "Ponto de controle de módulo"
     },
     "handleArrow": {
       "title": "Seta do ponto de manuseio"
+    },
+    "customSurface": {
+      "title": "Estilo de superfície personalizado"
     },
     "import": {
       "title": "Importar",
       "description": "Importar tema de um arquivo JSON.",
       "error": "O arquivo não contém um tema."
-    },
-    "customSurface": {
-      "title": "Estilo de superfície personalizado"
     }
   },
   "languageModal": {
@@ -607,11 +630,15 @@
       },
       "groupRotateScale": {
         "title": "Agrupar, rotacionar e ajustar escala de objetos",
-        "description": "Segure Ctrl, clique em um ou mais objetos ou pontos de controle, então clique em espaço vazio para agrupar esses pontos e criar um ponto de manuseio. Arraste o ponto de manuseio (ou use as setas do teclado) para mover o grupo; Shift+arraste para limitar a horizontal/vertical; Ctrl+arraste para rotacionar, Ctrl+Shift+arraste para ajustar escala. Arraste o \"+\" para definir o centro de rotação/escala. Clique no ponto de manuseio e aperte Ctrl+D para duplicar o grupo; aperte Delete para desagrupar."
+        "description": "Segure Ctrl, clique em um ou mais objetos (ou pontos de controle individuais), então clique no espaço vazio para agrupá-los e crie um ponto de manuseio (ícone de seta). Para aplicar a transformação, selecione o tipo de transformação desejado e tamanho de passo, então arraste o ponto de manuseio. Para rotação/escala, arraste o \"+\" para definir o centro. Clique no ponto de manuseio e aperte Ctrl+D para duplicar o grupo; aperte Delete para desagrupar."
       },
       "editCoordinates": {
         "title": "Editar coordenadas diretamente",
         "description": "Clique duplo ou clique com botão direito no ponto de controle do objeto, edite as coordenadas (x,y), então aperte Enter."
+      },
+      "arrayFormula": {
+        "title": "Listas e objetos a partir de fórmulas",
+        "description": "Para definir listas de objetos (ex.: uma grade de espelhos com espaçamento ajustável) ou objetos a partir de fórmulas (ex.: um prisma trapezoidal com ângulos ajustáveis), veja \"Ferramentas -> Outros -> Importar Módulos -> Criar módulos personalizados\"."
       },
       "keyboardShortcuts": {
         "title": "Atalhos de teclado",
@@ -623,7 +650,7 @@
       },
       "integrations": {
         "title": "Integrações com linguagens de programação",
-        "description": "Você pode chamar o simulador usando linguagens de programação como Python ou Julia com as [ferramentas de integração](/integrations). Note que este app web também possui algum suporte a programação integrado com o recurso [módulo](/modules/tutorial)."
+        "description": "Você pode chamar o simulador usando linguagens de programação como Python ou Julia com as [ferramentas de integração](/integrations)."
       },
       "contactUs": {
         "title": "Contate-nos",

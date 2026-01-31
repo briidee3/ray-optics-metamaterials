@@ -48,6 +48,15 @@
       "title": "牛頓望遠鏡",
       "description": "這是一個配有Plössl目鏡的牛頓望遠鏡模型。"
     },
+    "classicalCassegrainTelescopes": {
+      "title": "經典卡塞格林望遠鏡",
+      "description": "本模擬展示了兩種經典卡塞格林望遠鏡。",
+      "concaveparabolicmirr": "凹拋物面鏡",
+      "convexhyperbolicmirr": "凸雙曲面鏡",
+      "convexparabolicmirro": "凸拋物面鏡",
+      "classicalcassegrain": "經典卡塞格林",
+      "collimator": "準直器"
+    },
     "penroseUnilluminableRoom": {
       "title": "無法照亮的潘洛斯房間",
       "description": "無法照亮的潘洛斯房間由橢圓形、圓形和線性鏡子構成。它有一個有趣的特性，即房間內的一個點源（綠色）無論放在哪裡，都不會照亮整個房間。您可以拖動綠色點以移動源。",
@@ -271,6 +280,10 @@
       "inthepigeonpointligh": "在鴿點燈塔白板光學演示中，\n菲涅耳的巧思使半球中的所有光線都能發送到船隻",
       "howitworks": "運作原理"
     },
+    "opticsOfHumanEye": {
+      "title": "人眼的光學",
+      "description": "這是一個關於眼睛如何運作的模擬。您可以調整瞳孔大小和水晶體的焦距。"
+    },
     "zoomLens": {
       "title": "變焦鏡頭",
       "description": "這個模擬展示了一個變焦鏡頭（Zoom Lens），您可以通過拖動中間的凹透鏡來變焦。",
@@ -431,6 +444,10 @@
       "camera": "相機",
       "cmos": "CMOS"
     },
+    "digitalCamera": {
+      "title": "數位相機",
+      "description": "這個簡單的模擬展示了數位相機的聚焦和光圈的概念。"
+    },
     "nlSimulation": {
       "title": "NL 雙筒望遠鏡",
       "description": "這個模擬展示了 Swarovski NL 雙筒望遠鏡的粗略草圖。"
@@ -484,6 +501,10 @@
       "reflectingmonochroma": "反射式單色儀",
       "rotatediffractiongra": "旋轉繞射光柵\n以從多波長混合的光\n之中取得窄頻寬的光",
       "exitslitmonochromati": "出射口\n\n單色光"
+    },
+    "gratingPulseCompressor": {
+      "title": "光柵脈衝壓縮器",
+      "description": "使用透射光柵的摺疊式 Treacy 脈衝壓縮器。波長在紅外線範圍內，以假色顯示。"
     },
     "solarEclipses": {
       "title": "日食",

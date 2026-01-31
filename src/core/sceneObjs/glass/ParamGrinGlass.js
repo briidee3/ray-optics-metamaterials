@@ -52,7 +52,8 @@ class ParamGrinGlass extends ParamCurveObjMixin(BaseGrinGlass) {
     refIndexFn: '1+e^{-\\frac{x^2+y^2}{50^2}}',
     absorptionFn: '0',
     stepSize: 1,
-    intersectTol: 1e-3
+    intersectTol: 1e-3,
+    partialReflect: true
   };
 
   populateObjBar(objBar) {
@@ -152,9 +153,7 @@ class ParamGrinGlass extends ParamCurveObjMixin(BaseGrinGlass) {
   }
 
   checkRayIntersects(ray) {
-    console.log('checkRayIntersects', this.fn_p);
     if (!this.fn_p) {
-      console.log('initFns');
       this.initFns();
     }
     

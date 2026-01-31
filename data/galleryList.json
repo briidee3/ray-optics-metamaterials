@@ -40,6 +40,12 @@
         ]
       },
       {
+        "id": "classical-cassegrain-telescopes",
+        "contributors": [
+          "bird0cosmic"
+        ]
+      },
+      {
         "id": "penrose-unilluminable-room",
         "contributors": [
           "Vincent Fan",
@@ -245,6 +251,12 @@
         "contributors": [
           "Richard Ruh"
         ]
+      },
+      {
+        "id": "optics-of-human-eye",
+        "contributors": [
+          "bri"
+        ]
       }
     ]
   },
@@ -397,6 +409,12 @@
         ]
       },
       {
+        "id": "digital-camera",
+        "contributors": [
+          "Jorge Bodroghy Leite"
+        ]
+      },
+      {
         "id": "NL-simulation",
         "contributors": [
           "Wen Zhou"
@@ -437,6 +455,12 @@
         "id": "reflecting-monochromator",
         "contributors": [
           "James Garrard"
+        ]
+      },
+      {
+        "id": "grating-pulse-compressor",
+        "contributors": [
+          "DeadeyeSun"
         ]
       },
       {

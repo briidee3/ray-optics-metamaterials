@@ -86,7 +86,7 @@
 <script>
 /**
  * @module ObjBar
- * @description The Vue component for the object bar. Note that many UI code has not been refactored using a proper Vue approach. In particular, the controls in the object bar are populated using plain JavaScript in `objBar.js`.
+ * @description The Vue component for the object bar. It is mixed-paradigm code that combines Vue and vanilla JavaScript due to historical reasons.
  */
 import { computed, toRef } from 'vue'
 import { vTooltipPopover } from '../directives/tooltip-popover'
@@ -189,6 +189,11 @@ export default {
   white-space: nowrap;
   padding-left: 3px;
   padding-right: 3px;
+}
+
+.obj-bar-vue-control {
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .obj-bar .form-range {

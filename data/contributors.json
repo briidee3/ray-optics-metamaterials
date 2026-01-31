@@ -442,9 +442,6 @@
   },
   {
     "name": "TamilNeram",
-    "githubEmails": [
-      "anishprabu.t@gmail.com"
-    ],
     "contributions": {
       "translations": [
         "ta"
@@ -643,9 +640,10 @@
     "firstCommit": "2025-08-14"
   },
   {
-    "name": "briidee3",
+    "name": "Brianna D'Urso",
     "githubEmails": [
-      "briidee3@gmail.com"
+      "briidee3@gmail.com",
+      "brid3@proton.me"
     ],
     "contributions": {
       "code": true
@@ -730,5 +728,118 @@
       ]
     },
     "firstCommit": "2025-11-07"
+  },
+  {
+    "name": "bri",
+    "contributions": {
+      "gallery": true
+    },
+    "firstCommit": "2025-11-21"
+  },
+  {
+    "name": "corentin N",
+    "githubEmails": [
+      "corentin.nannini@hotmail.fr"
+    ],
+    "contributions": {
+      "translations": [
+        "fr"
+      ]
+    },
+    "firstCommit": "2025-11-28"
+  },
+  {
+    "name": "Adrián González Rodríguez",
+    "contributions": {
+      "translations": [
+        "es"
+      ]
+    },
+    "firstCommit": "2025-12-05"
+  },
+  {
+    "name": "bird0cosmic",
+    "contributions": {
+      "gallery": true
+    },
+    "firstCommit": "2025-12-12"
+  },
+  {
+    "name": "Qurbonsaid",
+    "githubEmails": [
+      "kuzatuvchi.my@gmail.com"
+    ],
+    "contributions": {
+      "translations": [
+        "uz"
+      ]
+    },
+    "firstCommit": "2025-12-18"
+  },
+  {
+    "name": "Georges Le Goaster",
+    "githubEmails": [
+      "g.legoaster@gmail.com"
+    ],
+    "contributions": {
+      "translations": [
+        "fr"
+      ]
+    },
+    "firstCommit": "2025-12-21"
+  },
+  {
+    "name": "Mars goshi",
+    "githubEmails": [
+      "mars536325@gmail.com"
+    ],
+    "contributions": {
+      "translations": [
+        "ar"
+      ]
+    },
+    "firstCommit": "2025-12-23"
+  },
+  {
+    "name": "Levent Candan",
+    "githubEmails": [
+      "leventcandan@gmail.com"
+    ],
+    "contributions": {
+      "translations": [
+        "tr"
+      ]
+    },
+    "firstCommit": "2025-12-25"
+  },
+  {
+    "name": "Márk Fazekas",
+    "contributions": {
+      "translations": [
+        "hu"
+      ]
+    },
+    "firstCommit": "2025-12-30"
+  },
+  {
+    "name": "Jorge Bodroghy Leite",
+    "contributions": {
+      "gallery": true
+    },
+    "firstCommit": "2026-01-09"
+  },
+  {
+    "name": "Brad Goodman",
+    "contributions": {
+      "modules": true
+    },
+    "firstCommit": "2026-01-16"
+  },
+  {
+    "name": "DeadeyeSun",
+    "contributions": {
+      "gallery": true
+    },
+    "firstCommit": "2026-01-16"
   }
 ]

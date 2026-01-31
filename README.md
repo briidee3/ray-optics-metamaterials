@@ -18,7 +18,7 @@ A web app for creating and simulating 2D geometric optical scenes, with a galler
 - Simulate gradient-index material defined by a custom refractive index function
 - Simulate mixture of colors, color filtering, and chromatic dispersion
 - Simulate diffraction gratings.
-- Simulate custom surfaces with ray interaction defined by custom equations<sup>Beta</sup>
+- Simulate custom surfaces with ray interaction defined by custom equations
 - View extensions of rays to see if they converge to a virtual image
 - View real images, virtual images, and virtual objects directly
 - View images that can be observed from some given position
@@ -182,7 +182,7 @@ npm run build-integrations
 ## License
 
 ```
-Copyright 2016–2025 The Ray Optics Simulation authors and contributors
+Copyright 2016–2026 The Ray Optics Simulation authors and contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
