@@ -108,7 +108,7 @@
       "title": "Auto sync URL",
       "description": "When enabled, the URL will be updated automatically with the current scene, so you don't need to keep saving the scene manually. To set the title, use File -> Save -> Rename."
     },
-    "showJsonEditor": {
+    "showSidebar": {
       "title": "Show JSON editor",
       "description": "Show the code editor for the JSON representation of the scene, which is needed when creating a custom module (See Tools -> Other -> Import Modules -> Make custom modules)."
     },
@@ -597,6 +597,42 @@
     "invalidFile": "The file is neither a valid JSON scene nor an image file."
   },
   "sidebar": {
+    "tabs": {
+      "visual": "Visual",
+      "code": "Code",
+      "ai": "AI",
+      "surface-editor": "Surface Editor"
+    },
+    "objectList": {
+      "title": "Objects",
+      "unnamedObject": "Unnamed object",
+      "unknownType": "Unknown type",
+      "sceneInfo": "List of objects which are directly in the scene. To parametrize them (with custom variables, arrays, etc.), you need to move them into a module. Objects inside modules are not directly listed here, and each instance of a module is shown as a single object.",
+      "moduleInfo": "Objects (or template of objects) inside this module. They can be parametrized with custom variables and arrays, but cannot be directly edited in the canvas. Objects with hard-coded coordinates will be unmovable in the canvas."
+    },
+    "visualSubTabs": {
+      "scene": "Scene",
+      "createModule": "Create Module",
+      "createModuleInfo": "Modules let you group and reuse custom optical elements/settings. Create a module to start building a reusable component."
+    },
+    "sceneObjsEditor": {
+      "moveIntoModule": "Move into module",
+      "createModule": "Create Module",
+      "emptyHint": "To create an object, please use the toolbar and create it in the canvas."
+    },
+    "moduleEditor": {
+      "renameButton": "Rename",
+      "removeButton": "Remove Module",
+      "moveOut": "Move out",
+      "moveInHint": "To add an object to this module, please first create the object using the toolbar or select an existing object in the canvas.",
+      "moveIntoModule": "Move \"{{name}}\" into this module",
+      "noInstances": "No instances of this module are currently in the scene. To create an instance, use Tools -> Other -> {{name}}.",
+      "promptNewName": "New module name: (usually in PascalCase)",
+      "errorEmptyName": "Module name cannot be empty.",
+      "errorComma": "Module name cannot contain commas.",
+      "errorNameExists": "A module named \"{{name}}\" already exists.",
+      "confirmRemove": "Remove module \"{{name}}\"?"
+    },
     "aiAssistant": {
       "title": "AI Assistant",
       "description": "Link to Ray Optics Coder on ChatGPT. See Tools -> Other -> Import module -> Make custom modules for more information."

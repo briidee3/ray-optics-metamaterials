@@ -15,10 +15,10 @@
 -->
 
 <template>
-  <div id="sidebar" :class="{ 'sidebar-visible': showSidebar }" :style="{ width: sidebarWidth + 'px' }" :data-width="sidebarWidth">
-    <div id="sidebarMobileHeightDiff" class="d-none d-lg-block sidebar-mobile-height-diff"></div>
-    <div id="jsonEditorContainer">
-      <div class="sidebar-tabs" role="tablist" aria-label="Sidebar tabs">
+  <div id="surface-editor" :class="{ 'se-visible': showSurfaceEditor }" :style="{ width: seWidth + 'px' }" :data-width="seWidth">
+    <div id="seMobileHeightDiff" class="d-none d-lg-block se-mobile-height-diff"></div>
+    <div id="surfaceEditorContainer">
+      <!-- <div class="se-tabs" role="tablist" aria-label="Surface Editor tabs">
         <div class="sidebar-tabs-left">
           <button
             type="button"
@@ -50,16 +50,6 @@
           >
             {{ $t('simulator:sidebar.tabs.ai') }}
           </button>
-          <button
-            type="button"
-            class="sidebar-tab"
-            :class="{ active: activeTab === 'surface-editor' }"
-            role="tab"
-            :aria-selected="activeTab === 'surface-editor'"
-            @click="setActiveTab('surface-editor')"
-          >
-            {{ $t('simulator:sidebar.tabs.surface-editor') }}
-          </button>
         </div>
 
         <button
@@ -73,14 +63,13 @@
             <path d="M7.2 2.8L2.4 8 7.2 13.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
-      </div>
+      </div> -->
 
-      <div class="sidebar-tab-content">
+      <!-- <div class="sidebar-tab-content">
         <VisualTab v-if="showSidebar && activeTab === 'visual'" />
         <div id="jsonEditor" v-show="activeTab === 'code'"></div>
         <AITab v-show="activeTab === 'ai'" />
-        <SurfaceEditorTab v-show="activeTab === 'surface-editor'" />
-      </div>
+      </div> -->
     </div>
     <div 
       class="resize-handle"
@@ -98,8 +87,8 @@
     <button
       type="button"
       class="drawer-toggle-expand"
-      aria-label="Show sidebar"
-      @click="expandSidebar"
+      aria-label="Show surface editor"
+      @click="expandSurfaceEditor"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path d="M4 2.8L8.8 8 4 13.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -111,24 +100,25 @@
 
 <script>
 /**
- * @module Sidebar
- * @description The Vue component for the sidebar containing the JSON editor.
+ * @module SurfaceEditor
+ * @description The Vue component for the NURBS surface editor for use defining GRIN fields.
  */
 import { usePreferencesStore } from '../store/preferences'
 import { toRef, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { jsonEditorService } from '../services/jsonEditor'
-import VisualTab from './sidebar/VisualTab.vue'
-import AITab from './sidebar/AITab.vue'
-import SurfaceEditorTab from './sidebar/SurfaceEditorTab.vue'
+// import { jsonEditorService } from '../services/jsonEditor'
+import { surfaceEditorService } from '../services/surfaceEditor'
+// import VisualTab from './sidebar/VisualTab.vue'
+// import AITab from './sidebar/AITab.vue'
 
 export default {
-  name: 'Sidebar',
-  components: { VisualTab, AITab, SurfaceEditorTab },
+  name: 'SurfaceEditor',
+  // components: { VisualTab, AITab },
+  components: { },
   setup() {
     const preferences = usePreferencesStore()
-    const sidebarWidth = toRef(preferences, 'sidebarWidth')
-    const showSidebar = toRef(preferences, 'showSidebar')
-    const activeTab = toRef(preferences, 'sidebarTab')
+    const seWidth = toRef(preferences, 'seWidth')
+    const showSurfaceEditor = toRef(preferences, 'showSurfaceEditor')
+    const activeTab = toRef(preferences, 'seTab')
     
     const isResizing = ref(false)
     const startX = ref(0)
@@ -142,7 +132,7 @@ export default {
     
     const startResize = (e) => {
       e.preventDefault() // Prevent default touch behavior
-      const initialWidth = sidebarWidth.value
+      const initialWidth = seWidth.value
       isResizing.value = true
       
       // Handle both mouse and touch events
@@ -173,7 +163,7 @@ export default {
       const deltaX = clientX - startX.value
       const newWidth = Math.max(250, Math.min(800, startWidth.value + deltaX))
       
-      sidebarWidth.value = newWidth
+      seWidth.value = newWidth
       
       // Trigger Ace editor resize with a small delay
       setTimeout(() => {
@@ -196,11 +186,11 @@ export default {
       document.body.style.userSelect = ''
     }
 
-    const hideSidebar = () => {
-      showSidebar.value = false
+    const hideSurfaceEditor = () => {
+      showSurfaceEditor.value = false
     }
 
-    const expandSidebar = () => {
+    const expandSurfaceEditor = () => {
       showSidebar.value = true
       // Helps Ace re-measure if it was off-screen during the transition.
       setTimeout(() => {
@@ -219,8 +209,8 @@ export default {
     const resizeAceSoon = async () => {
       await nextTick()
       setTimeout(() => {
-        if (jsonEditorService.aceEditor) {
-          jsonEditorService.aceEditor.resize()
+        if (surfaceEditorService.aceEditor) {
+          surfaceEditorService.aceEditor.resize()
         }
       }, 0)
     }
@@ -237,28 +227,15 @@ export default {
         setTimeout(() => resizeAceSoon(), 320)
       }
     })
-
-    watch(activeTab, (tab) => {
-      if (tab === 'surface-editor') {
-        resizeAceSoon()
-      }
-    })
-
-    watch(showSidebar, (isShown) => {
-      if (isShown && activeTab.value === 'surface-editor') {
-        // Wait for the drawer slide-in transition as well.
-        setTimeout(() => resizeAceSoon(), 320)
-      }
-    })
     
     onMounted(() => {
       // Add keyboard event listeners to prevent propagation from JSON editor
-      const jsonEditor = document.getElementById('jsonEditor')
+      const surfaceEditor = document.getElementById('surfaceEditor')
       
-      if (jsonEditor) {
-        jsonEditor.addEventListener('keydown', handleKeyboardEvent, false)
-        jsonEditor.addEventListener('keyup', handleKeyboardEvent, false)
-        jsonEditor.addEventListener('keypress', handleKeyboardEvent, false)
+      if (surfaceEditor) {
+        surfaceEditor.addEventListener('keydown', handleKeyboardEvent, false)
+        surfaceEditor.addEventListener('keyup', handleKeyboardEvent, false)
+        surfaceEditor.addEventListener('keypress', handleKeyboardEvent, false)
       }
     })
     
@@ -270,22 +247,22 @@ export default {
       document.removeEventListener('touchend', stopResize)
       
       // Clean up keyboard event listeners
-      const jsonEditor = document.getElementById('jsonEditor')
+      const surfaceEditor = document.getElementById('surfaceEditor')
       
-      if (jsonEditor) {
-        jsonEditor.removeEventListener('keydown', handleKeyboardEvent, false)
-        jsonEditor.removeEventListener('keyup', handleKeyboardEvent, false)
-        jsonEditor.removeEventListener('keypress', handleKeyboardEvent, false)
+      if (surfaceEditor) {
+        surfaceEditor.removeEventListener('keydown', handleKeyboardEvent, false)
+        surfaceEditor.removeEventListener('keyup', handleKeyboardEvent, false)
+        surfaceEditor.removeEventListener('keypress', handleKeyboardEvent, false)
       }
     })
     
     return {
-      showSidebar,
-      sidebarWidth,
+      showSurfaceEditor,
+      seWidth,
       activeTab,
       startResize,
-      hideSidebar,
-      expandSidebar,
+      hideSurfaceEditor,
+      expandSurfaceEditor,
       setActiveTab
     }
   }
@@ -293,7 +270,7 @@ export default {
 </script>
 
 <style scoped>
-#sidebar {
+#surface-editor {
   position: absolute;
   z-index: -2;
   top: 46px;
@@ -307,16 +284,16 @@ export default {
   pointer-events: none;
 }
 
-#sidebar.sidebar-visible {
+#surface-editor.se-visible {
   transform: translateX(0);
   pointer-events: auto;
 }
 
-.sidebar-mobile-height-diff {
+.se-mobile-height-diff {
   height: 22px;
 }
 
-#jsonEditorContainer {
+#surfaceEditorContainer {
   width: 100%;
   flex-grow: 1;
   background-color:rgba(45, 51, 57,0.8);
@@ -327,7 +304,7 @@ export default {
   flex-direction: column;
 }
 
-.sidebar-tabs {
+.se-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -336,12 +313,12 @@ export default {
   flex-shrink: 0;
 }
 
-.sidebar-tabs-left {
+.se-tabs-left {
   display: flex;
   gap: 4px;
 }
 
-.sidebar-collapse-btn {
+.se-collapse-btn {
   margin-left: auto;
   appearance: none;
   border: none;
@@ -353,23 +330,23 @@ export default {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.sidebar-collapse-btn:hover {
+.se-collapse-btn:hover {
   background: rgba(60, 65, 70, 0.55);
   color: rgba(255, 255, 255, 0.95);
 }
 
-.sidebar-collapse-btn:focus-visible {
+.se-collapse-btn:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.22);
   outline-offset: 2px;
 }
 
-.sidebar-collapse-btn svg {
+.se-collapse-btn svg {
   display: block;
   width: 14px;
   height: 14px;
 }
 
-.sidebar-tab {
+.se-tab {
   appearance: none;
   border: none;
   background: rgba(60, 65, 70, 0.35);
@@ -381,28 +358,28 @@ export default {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.sidebar-tab:hover {
+.se-tab:hover {
   background: rgba(60, 65, 70, 0.55);
   color: rgba(255, 255, 255, 0.9);
 }
 
-.sidebar-tab.active {
+.se-tab.active {
   background: rgba(90, 95, 100, 0.9);
   color: rgba(255, 255, 255, 0.95);
 }
 
-.sidebar-tab:focus-visible {
+.se-tab:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.22);
   outline-offset: 2px;
 }
 
-.sidebar-tab-content {
+.se-tab-content {
   flex-grow: 1;
   min-height: 0;
   position: relative;
 }
 
-#jsonEditor {
+#surfaceEditor {
   width: 100%;
   height: 100%
 }
