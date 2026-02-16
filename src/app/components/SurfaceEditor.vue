@@ -17,8 +17,8 @@
 <template>
   <div id="surface-editor" :class="{ 'se-visible': showSurfaceEditor }" :style="{ width: seWidth + 'px' }" :data-width="seWidth">
     <div id="seMobileHeightDiff" class="d-none d-lg-block se-mobile-height-diff"></div>
-    <div id="surfaceEditorContainer">
-      <!-- <div class="se-tabs" role="tablist" aria-label="Surface Editor tabs">
+    <!-- <div id="surfaceEditorContainer">
+      <div class="se-tabs" role="tablist" aria-label="Surface Editor tabs">
         <div class="sidebar-tabs-left">
           <button
             type="button"
@@ -69,8 +69,10 @@
         <VisualTab v-if="showSidebar && activeTab === 'visual'" />
         <div id="jsonEditor" v-show="activeTab === 'code'"></div>
         <AITab v-show="activeTab === 'ai'" />
-      </div> -->
-    </div>
+      </div>
+    </div> -->
+    <canvas ref="surfaceEditorContainer" id="surfaceEditorContainer"></canvas>
+    <!-- <div ref="surfaceEditorDiv"></div> -->
     <div 
       class="resize-handle"
       @mousedown="startResize"
@@ -104,17 +106,57 @@
  * @description The Vue component for the NURBS surface editor for use defining GRIN fields.
  */
 import { usePreferencesStore } from '../store/preferences'
-import { toRef, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { toRef, ref, toRaw, onMounted, onUnmounted, nextTick, watch, useTemplateRef } from 'vue'
 // import { jsonEditorService } from '../services/jsonEditor'
-import { surfaceEditorService } from '../services/surfaceEditor'
+// import { surfaceEditorService } from '../services/surfaceEditor'
 // import VisualTab from './sidebar/VisualTab.vue'
 // import AITab from './sidebar/AITab.vue'
+import BasicScene from '../components/nurbs-editor/src/utils/BasicScene'
+import SurfaceObject from '../components/nurbs-editor/src/utils/NURBSSurface'
+import * as THREE from 'three'
 
 export default {
   name: 'SurfaceEditor',
   // components: { VisualTab, AITab },
   components: { },
   setup() {
+    // if (this.sceneSetup) return
+
+    // const canvas = document.querySelector("#surfaceEditorContainer")
+    // const canvas = document.getElementById("surfaceEditorContainer")
+    // console.log(canvas)
+    // const surfaceEditorDiv = ref(null)
+    // onMounted(() => {
+    //   // Add keyboard event listeners to prevent propagation from JSON editor
+    //   const jsonEditor = document.getElementById('jsonEditor')
+      
+    //   if (jsonEditor) {
+    //     jsonEditor.addEventListener('keydown', handleKeyboardEvent, false)
+    //     jsonEditor.addEventListener('keyup', handleKeyboardEvent, false)
+    //     jsonEditor.addEventListener('keypress', handleKeyboardEvent, false)
+    //   }
+    // })
+    
+    // onUnmounted(() => {
+    //   // Clean up event listeners if component is destroyed during resize
+    //   document.removeEventListener('mousemove', handleResize)
+    //   document.removeEventListener('mouseup', stopResize)
+    //   document.removeEventListener('touchmove', handleResize)
+    //   document.removeEventListener('touchend', stopResize)
+      
+    //   // Clean up keyboard event listeners
+    //   const jsonEditor = document.getElementById('jsonEditor')
+      
+    //   if (jsonEditor) {
+    //     jsonEditor.removeEventListener('keydown', handleKeyboardEvent, false)
+    //     jsonEditor.removeEventListener('keyup', handleKeyboardEvent, false)
+    //     jsonEditor.removeEventListener('keypress', handleKeyboardEvent, false)
+    //   }
+    // })
+
+
+
+
     const preferences = usePreferencesStore()
     const seWidth = toRef(preferences, 'seWidth')
     const showSurfaceEditor = toRef(preferences, 'showSurfaceEditor')
@@ -165,12 +207,12 @@ export default {
       
       seWidth.value = newWidth
       
-      // Trigger Ace editor resize with a small delay
-      setTimeout(() => {
-        if (jsonEditorService.aceEditor) {
-          jsonEditorService.aceEditor.resize()
-        }
-      }, 0)
+      // // Trigger Ace editor resize with a small delay
+      // setTimeout(() => {
+      //   if (jsonEditorService.aceEditor) {
+      //     jsonEditorService.aceEditor.resize()
+      //   }
+      // }, 0)
     }
     
     const stopResize = () => {
@@ -191,7 +233,7 @@ export default {
     }
 
     const expandSurfaceEditor = () => {
-      showSidebar.value = true
+      showSurfaceEditor.value = true
       // Helps Ace re-measure if it was off-screen during the transition.
       setTimeout(() => {
         if (jsonEditorService.aceEditor) {
@@ -221,38 +263,10 @@ export default {
       }
     })
 
-    watch(showSidebar, (isShown) => {
-      if (isShown && activeTab.value === 'code') {
+    watch(showSurfaceEditor, (isShown) => {
+      if (isShown && activeTab.value === 'surface-editor') {
         // Wait for the drawer slide-in transition as well.
-        setTimeout(() => resizeAceSoon(), 320)
-      }
-    })
-    
-    onMounted(() => {
-      // Add keyboard event listeners to prevent propagation from JSON editor
-      const surfaceEditor = document.getElementById('surfaceEditor')
-      
-      if (surfaceEditor) {
-        surfaceEditor.addEventListener('keydown', handleKeyboardEvent, false)
-        surfaceEditor.addEventListener('keyup', handleKeyboardEvent, false)
-        surfaceEditor.addEventListener('keypress', handleKeyboardEvent, false)
-      }
-    })
-    
-    onUnmounted(() => {
-      // Clean up event listeners if component is destroyed during resize
-      document.removeEventListener('mousemove', handleResize)
-      document.removeEventListener('mouseup', stopResize)
-      document.removeEventListener('touchmove', handleResize)
-      document.removeEventListener('touchend', stopResize)
-      
-      // Clean up keyboard event listeners
-      const surfaceEditor = document.getElementById('surfaceEditor')
-      
-      if (surfaceEditor) {
-        surfaceEditor.removeEventListener('keydown', handleKeyboardEvent, false)
-        surfaceEditor.removeEventListener('keyup', handleKeyboardEvent, false)
-        surfaceEditor.removeEventListener('keypress', handleKeyboardEvent, false)
+        // setTimeout(() => resizeAceSoon(), 320)
       }
     })
     
@@ -264,6 +278,52 @@ export default {
       hideSurfaceEditor,
       expandSurfaceEditor,
       setActiveTab
+    }
+  },
+  data() {
+    return {
+      sceneSetup: null,
+      nurbsObjs: null,
+      canvas: null,
+      renderer: null,
+      scene: null,
+      grid: null
+    }
+  },
+  mounted() {
+    this.initScene()
+    this.renderScene()
+  },
+  beforeDestroy() {
+    this.renderer.dispose()
+    this.scene.dispose()
+  },
+  methods: {
+    initScene() {
+
+      // this.canvas = useTemplateRef("surfaceEditorContainer")
+      this.canvas = toRaw(this.$refs.surfaceEditorContainer)
+
+
+      console.log("canvas", this.canvas)
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: this.canvas })
+      this.scene = new THREE.Scene()
+      this.sceneSetup = new BasicScene({ dimension: 2, objects: [], canvas: this.canvas, renderer: this.renderer, scene: this.scene})
+
+      this.sceneSetup.sceneObjects.camera.position.z = 1000;
+
+      this.nurbsObjs = []
+      this.nurbsObjs.push(new SurfaceObject({ threeScene: this.sceneSetup }))
+      this.sceneSetup.addObject(this.nurbsObjs.nurbsObj)
+
+      this.grid = new THREE.GridHelper(10000, 250)
+      this.grid.rotation.x = Math.PI * 0.5
+      this.grid.position.z = -1.1
+      this.sceneSetup.addObject(this.grid)
+    },
+    renderScene() {
+      // this.sceneSetup.runRenderLoop(document, this.sceneSetup.defaultAnimateLoop())
+      this.sceneSetup.defaultAnimateLoop()
     }
   }
 }
@@ -295,6 +355,7 @@ export default {
 
 #surfaceEditorContainer {
   width: 100%;
+  height: 100%;
   flex-grow: 1;
   background-color:rgba(45, 51, 57,0.8);
   backdrop-filter: blur(2px);

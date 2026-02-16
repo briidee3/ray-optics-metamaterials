@@ -615,6 +615,11 @@
       "createModule": "Create Module",
       "createModuleInfo": "Modules let you group and reuse custom optical elements/settings. Create a module to start building a reusable component."
     },
+    "seSubTabs": {
+      "scene": "Scene",
+      "surfaceEditor": "Surface Editor",
+      "importLensBoundary": "Import lens boundary from scene"
+    },
     "sceneObjsEditor": {
       "moveIntoModule": "Move into module",
       "createModule": "Create Module",

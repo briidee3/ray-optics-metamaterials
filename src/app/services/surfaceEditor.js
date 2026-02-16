@@ -21,42 +21,52 @@
 // import { Range } from 'ace-builds';
 import { app } from '../services/app'
 // import { CustomJsonMode } from '../utils/customJsonMode'
-import 
+import { BasicScene } from '../components/nurbs-editor/src/utils/BasicScene'
+import { SurfaceObject } from '../components/nurbs-editor/src/utils/NURBSSurface'
+import * as THREE from 'three'
 
 /**
  * Service to manage the NURBS surface editor instance and its interactions with the scene
  */
-class JsonEditorService {
+class SurfaceEditorService {
   constructor() {
-    this.aceEditor = null
-    this.debounceTimer = null
-    this.lastCodeChangeIsFromScene = false
-    this.manualParse = false
-    this.isSynced = true
+    // Initialize scene
+    /* 
+     * TODO:
+     * - don't have this stuff loaded when side window minimized
+     * - set this up or delete it (this file)
+     */
+    this.sceneSetup = null
+    this.canvas = null
+    this.renderer = null
+    this.scene = null
+
+    this.nurbsObjs = null
   }
 
   /**
    * Initialize the JSON editor with the given content
    */
   initialize() {
-    if (this.aceEditor) return
+    if (this.sceneSetup) return
 
-    this.aceEditor = ace.edit("jsonEditor")
-    this.aceEditor.setTheme("ace/theme/github_dark")
-    this.aceEditor.session.setMode(new CustomJsonMode())
-    this.aceEditor.session.setUseWrapMode(true)
-    this.aceEditor.session.setUseSoftTabs(true)
-    this.aceEditor.session.setTabSize(2)
-    this.aceEditor.setHighlightActiveLine(false)
-    this.aceEditor.container.style.background = "transparent"
-    this.aceEditor.container.getElementsByClassName('ace_gutter')[0].style.background = "transparent"
-    
-    // Set initial content
-    this.aceEditor.session.setValue(app.editor?.lastActionJson ?? '')
-    this.isSynced = true
+    this.canvas = document.querySelector("#surfaceEditorContainer")
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas })
+    this.scene = new THREE.Scene()
+    this.sceneSetup = new BasicScene({ dimension: 2, objects: [], canvas: canvas, renderer: renderer, scene: scene})
 
-    // Set up change listener
-    this.aceEditor.session.on('change', this.handleEditorChange.bind(this))
+    sceneSetup.sceneObjects.camera.position.z = 1000;
+
+    this.nurbsObjs = []
+    this.nurbsObjs.push(new SurfaceObject({ threeScene: sceneSetup }))
+    sceneSetup.addObject(nurbsObj.nurbsObj)
+
+    const grid = new THREE.GridHelper(10000, 250)
+    grid.rotation.x = Math.PI * 0.5
+    grid.position.z = -1.1
+    sceneSetup.addObject(grid)
+
+    sceneSetup.runRenderLoop(document, sceneSetup.defaultAnimateLoop())
   }
 
   /**
@@ -185,4 +195,4 @@ class JsonEditorService {
 }
 
 // Export a singleton instance
-export const jsonEditorService = new JsonEditorService()
+export const surfaceEditorService = new SurfaceEditorService()

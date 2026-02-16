@@ -31,6 +31,7 @@
     "seedrandom": "^3.0.5",
     "style-loader": "^4.0.0",
     "tex-math-parser": "^2.0.4",
+    "three": "^0.182.0",
     "vue": "^3.0.0",
     "webpack": "^5.95.0",
     "webpack-cli": "^5.1.4",
