@@ -71,7 +71,8 @@
         <AITab v-show="activeTab === 'ai'" />
       </div>
     </div> -->
-    <canvas ref="surfaceEditorContainer" id="surfaceEditorContainer"></canvas>
+    <!-- <canvas ref="surfaceEditorContainer" id="surfaceEditorContainer"></canvas> -->
+    <!-- <canvas ref="canvas" id="surfaceEditorContainer"></canvas> -->
     <!-- <div ref="surfaceEditorDiv"></div> -->
     <div 
       class="resize-handle"
@@ -106,7 +107,7 @@
  * @description The Vue component for the NURBS surface editor for use defining GRIN fields.
  */
 import { usePreferencesStore } from '../store/preferences'
-import { toRef, ref, toRaw, onMounted, onUnmounted, nextTick, watch, useTemplateRef } from 'vue'
+import { toRef, ref, toRaw, markRaw, onMounted, onUnmounted, nextTick, watch, useTemplateRef } from 'vue'
 // import { jsonEditorService } from '../services/jsonEditor'
 // import { surfaceEditorService } from '../services/surfaceEditor'
 // import VisualTab from './sidebar/VisualTab.vue'
@@ -302,7 +303,10 @@ export default {
     initScene() {
 
       // this.canvas = useTemplateRef("surfaceEditorContainer")
-      this.canvas = toRaw(this.$refs.surfaceEditorContainer)
+      this.canvas = this.$refs.canvas
+      
+      // const canvas = ref(null)
+      // const canvas = document.getElementById("surfaceEditorContainer")
 
 
       console.log("canvas", this.canvas)
@@ -323,7 +327,11 @@ export default {
     },
     renderScene() {
       // this.sceneSetup.runRenderLoop(document, this.sceneSetup.defaultAnimateLoop())
-      this.sceneSetup.defaultAnimateLoop()
+      // this.sceneSetup.defaultAnimateLoop()
+      if (this.sceneSetup.ctrlKeyPressed) {
+          this.sceneSetup.dragControls.transformGroup = false;
+      }
+      this.sceneSetup.sceneObjects.renderer.render(toRaw(this.sceneSetup.sceneObjects.scene), toRaw(this.sceneSetup.sceneObjects.camera));
     }
   }
 }
