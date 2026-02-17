@@ -24,7 +24,8 @@
     </div>
     <div class="se-subtab-content" role="tabpanel" @click="handleContentClick">
       <SceneObjsEditor v-if="activeTabId === 'scene'" />
-      <SurfaceEditor v-else-if="activeTabId === 'surfaceEditor'" />
+      <SurfaceEditor v-else/>
+      <!-- ="activeTabId === 'surfaceEditor'" /> -->
       <!-- <canvas class="surfaceEditorContainer"></canvas>> -->
     </div>
     <div class="se-tab-title">Surface Editor</div>
@@ -50,13 +51,16 @@ import SceneObjsEditor from './SceneObjsEditor.vue'
 import ModuleEditor from './ModuleEditor.vue'
 import InfoPopoverIcon from '../InfoPopoverIcon.vue'
 import SurfaceEditor from '../SurfaceEditor.vue'
+import { usePreferencesStore } from '../../store/preferences'
 
 export default {
   name: 'SurfaceEditorTab',
   components: { SceneObjsEditor, ModuleEditor, InfoPopoverIcon, SurfaceEditor },
   setup() {
+    const preferences = usePreferencesStore()
     const scene = useSceneStore()
     const moduleIds = toRef(scene, 'moduleIds')
+    const showSurfaceEditor = toRef(preferences, 'showSurfaceEditor')
 
     const moduleNames = computed(() => {
       const raw = moduleIds.value ? moduleIds.value.split(',') : []
@@ -109,10 +113,27 @@ export default {
 
     const handleSelectSceneTab = () => {
       activeTabId.value = 'scene'
+      hideSurfaceEditor()
     }
 
     const handleSelectEditorTab = () => {
       activeTabId.value = 'surfaceEditor'
+      revealSurfaceEditor()
+    }
+
+    const hideSurfaceEditor = () => {
+      showSurfaceEditor.value = false
+    }
+
+    const revealSurfaceEditor = () => {
+      showSurfaceEditor.value = true
+
+      // Handle resizing scene if sidebar was resized since it was last open
+      // setTimeout(() => {
+      //   if (jsonEditorService.aceEditor) {
+      //     jsonEditorService.aceEditor.resize()
+      //   }
+      // }, 350)
     }
 
     const handleContentClick = (event) => {
@@ -135,10 +156,14 @@ export default {
       // document.addEventListener('selectVisualModuleTab', handleSelectModuleTab)
       document.addEventListener('selectSeSceneTab', handleSelectSceneTab)
       document.addEventListener('selectSeEditorTab', handleSelectEditorTab)
+
+      if (activeTabId.value === 'surfaceEditor') { revealSurfaceEditor() }
     })
 
     onUnmounted(() => {
       // document.removeEventListener('selectVisualModuleTab', handleSelectModuleTab)
+      hideSurfaceEditor()
+
       document.removeEventListener('selectSeSceneTab', handleSelectSceneTab)
       document.removeEventListener('selectSeEditorTab', handleSelectEditorTab)
     })

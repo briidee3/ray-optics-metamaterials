@@ -72,8 +72,7 @@
       </div>
     </div> -->
     <!-- <canvas ref="surfaceEditorContainer" id="surfaceEditorContainer"></canvas> -->
-    <!-- <canvas ref="canvas" id="surfaceEditorContainer"></canvas> -->
-    <!-- <div ref="surfaceEditorDiv"></div> -->
+    <canvas ref="canvas" id="surfaceEditorCanvas"></canvas>
     <div 
       class="resize-handle"
       @mousedown="startResize"
@@ -120,8 +119,8 @@ export default {
   name: 'SurfaceEditor',
   // components: { VisualTab, AITab },
   components: { },
-  setup() {
-    // if (this.sceneSetup) return
+  setup(props, { expose }) {
+    // if (this.basicScene) return
 
     // const canvas = document.querySelector("#surfaceEditorContainer")
     // const canvas = document.getElementById("surfaceEditorContainer")
@@ -156,8 +155,6 @@ export default {
     // })
 
 
-
-
     const preferences = usePreferencesStore()
     const seWidth = toRef(preferences, 'seWidth')
     const showSurfaceEditor = toRef(preferences, 'showSurfaceEditor')
@@ -166,6 +163,53 @@ export default {
     const isResizing = ref(false)
     const startX = ref(0)
     const startWidth = ref(0)
+
+    // // const basicScene = null
+    // const canvas = document.createElement('canvas')
+    // canvas.setAttribute('ref', 'canvas')
+    // canvas.setAttribute('id', 'surfaceEditorCanvas')
+
+    // onMounted(() => {
+    //   document.getElementById('surface-editor').appendChild(canvas)
+    // })
+    // // const canvas = ref(null)//document.getElementById("surfaceEditorContainer")
+
+    // // Initialize the scene for the first time if it doesn't already exist
+    // // if (typeof this.basicScene === 'undefined' || this.basicScene === null) {
+    // //   console.log("in setup")
+    // //   initializeScene()
+    // // }
+
+    // // Set up everything in the scene
+    // // const initializeScene = () => {
+    //   // this.canvas = useTemplateRef("surfaceEditorContainer")
+    //   // this.canvas = this.$refs.canvas
+    //   // const canvas = ref(null)
+      
+    //   // const canvas = ref(null)
+
+
+    // console.log("canvas", canvas)
+    // const renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas })
+    // const scene = new THREE.Scene()
+    // const basicScene = new BasicScene({ dimension: 2, objects: [], canvas: canvas, renderer: renderer, scene: scene}) // assuming basicScene already initialized to null
+
+    // basicScene.sceneObjects.camera.position.z = 1000;
+
+    // const nurbsObjs = []
+    // nurbsObjs.push(new SurfaceObject({ threeScene: basicScene, texturePath: '../components/nurbs-editor/img/uv_grid_opengl.jpg' }))
+    // basicScene.addObject(nurbsObjs[0].nurbsObj)
+
+    // const grid = new THREE.GridHelper(10000, 250)
+    // grid.rotation.x = Math.PI * 0.5
+    // grid.position.z = -1.1
+    // basicScene.addObject(grid)
+    // }
+    // initializeScene()
+
+    // Allow access to these objects from outside of SurfaceEditor instances
+    // expose({ canvas: canvas, basicScene: basicScene })
+    // console.log(canvas)
     
     // Keyboard event handler to prevent propagation
     const handleKeyboardEvent = (e) => {
@@ -229,20 +273,6 @@ export default {
       document.body.style.userSelect = ''
     }
 
-    const hideSurfaceEditor = () => {
-      showSurfaceEditor.value = false
-    }
-
-    const expandSurfaceEditor = () => {
-      showSurfaceEditor.value = true
-      // Helps Ace re-measure if it was off-screen during the transition.
-      setTimeout(() => {
-        if (jsonEditorService.aceEditor) {
-          jsonEditorService.aceEditor.resize()
-        }
-      }, 350)
-    }
-
     const setActiveTab = (tab) => {
       activeTab.value = tab
     }
@@ -258,6 +288,40 @@ export default {
       }, 0)
     }
 
+    // Trigger an update to size of viewport component to resize it
+    const resizeScene = () => {
+      //
+    }
+
+    // Render the scene, assuming it already exists
+    const renderScene = () => {
+      // Update variables for the frame
+      // if (typeof this.basicScene !== 'undefined' && this.basicScene !== null) {
+      //   if (this.basicScene.ctrlKeyPressed) {
+      //       this.basicScene.dragControls.transformGroup = false;
+      //   }
+
+      //   // Render the frame
+      //   this.basicScene.sceneObjects.renderer.render(toRaw(this.basicScene.sceneObjects.scene), toRaw(this.basicScene.sceneObjects.camera));
+      // } else {
+      //   console.log("SurfaceEditor.js: renderScene(): this.basicScene does not exist!")
+      // }
+      // // Call next frame
+      // basicScene.sceneObjects.renderer.render(basicScene.sceneObjects.scene, basicScene.sceneObjects.camera);
+      // console.log(basicScene)
+      // renderScene()
+    }
+
+    // Resize and render the THREEjs scene for the surface editor
+    const showScene = () => {
+      // if (typeof basicScene !== 'undefined') {
+      //   resizeScene()
+      //   renderScene()
+      // } else {
+      //   console.log("SurfaceEditor.vue: Scene not yet created.")
+      // }
+    }
+
     watch(activeTab, (tab) => {
       if (tab === 'code') {
         resizeAceSoon()
@@ -267,7 +331,7 @@ export default {
     watch(showSurfaceEditor, (isShown) => {
       if (isShown && activeTab.value === 'surface-editor') {
         // Wait for the drawer slide-in transition as well.
-        // setTimeout(() => resizeAceSoon(), 320)
+        setTimeout(() => showScene(), 320)
       }
     })
     
@@ -276,14 +340,25 @@ export default {
       seWidth,
       activeTab,
       startResize,
-      hideSurfaceEditor,
-      expandSurfaceEditor,
+      // hideSurfaceEditor,
+      // expandSurfaceEditor,
       setActiveTab
     }
+    // expose({
+    //   showSurfaceEditor: showSurfaceEditor,
+    //   seWidth: seWidth,
+    //   activeTab: activeTab,
+    //   startResize: startResize,
+    //   // hideSurfaceEditor,
+    //   // expandSurfaceEditor,
+    //   setActiveTab: setActiveTab
+    // })
+
+    // return () =>
   },
   data() {
     return {
-      sceneSetup: null,
+      basicScene: null,
       nurbsObjs: null,
       canvas: null,
       renderer: null,
@@ -291,54 +366,165 @@ export default {
       grid: null
     }
   },
+  created() {
+    // this.initScene()
+  },
   mounted() {
-    this.initScene()
+    // this.initScene()
+    // this.renderScene()
+    // this.
+    if (!this.basicScene || typeof this.basicScene === 'undefined') {
+      this.initScene()
+    }
     this.renderScene()
   },
   beforeDestroy() {
-    this.renderer.dispose()
-    this.scene.dispose()
+    // this.renderer.dispose()
+    // this.scene.dispose()
   },
   methods: {
     initScene() {
 
-      // this.canvas = useTemplateRef("surfaceEditorContainer")
+        // // this.canvas = useTemplateRef("surfaceEditorContainer")
       this.canvas = this.$refs.canvas
-      
-      // const canvas = ref(null)
-      // const canvas = document.getElementById("surfaceEditorContainer")
+        
+        // // const canvas = ref(null)
+        // // const canvas = document.getElementById("surfaceEditorContainer")
+
+
+        // console.log("canvas", this.canvas)
+        // this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: this.canvas })
+        // this.scene = new THREE.Scene()
+        // this.basicScene = new BasicScene({ dimension: 2, objects: [], canvas: this.canvas, renderer: this.renderer, scene: this.scene})
+
+        // this.basicScene.sceneObjects.camera.position.z = 1000;
+
+        // this.nurbsObjs = []
+        // this.nurbsObjs.push(new SurfaceObject({ threeScene: this.basicScene }))
+        // this.basicScene.addObject(this.nurbsObjs[0].nurbsObj)
+
+        // this.grid = new THREE.GridHelper(10000, 250)
+        // this.grid.rotation.x = Math.PI * 0.5
+        // this.grid.position.z = -1.1
+        // this.basicScene.addObject(this.grid)
+      // const basicScene = null
+      // this.canvas = document.createElement('canvas')
+      // this.canvas.setAttribute('ref', 'canvas')
+      // this.canvas.setAttribute('id', 'surfaceEditorCanvas')
+      console.log(document)
+      // document.getElementById('surface-editor').appendChild(this.canvas)
+      // const canvas = ref(null)//document.getElementById("surfaceEditorContainer")
+
+      // Initialize the scene for the first time if it doesn't already exist
+      // if (typeof this.basicScene === 'undefined' || this.basicScene === null) {
+      //   console.log("in setup")
+      //   initializeScene()
+      // }
+
+      // Set up everything in the scene
+      // const initializeScene = () => {
+        // this.canvas = useTemplateRef("surfaceEditorContainer")
+        // this.canvas = this.$refs.canvas
+        // const canvas = ref(null)
+        
+        // const canvas = ref(null)
 
 
       console.log("canvas", this.canvas)
       this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: this.canvas })
       this.scene = new THREE.Scene()
-      this.sceneSetup = new BasicScene({ dimension: 2, objects: [], canvas: this.canvas, renderer: this.renderer, scene: this.scene})
+      this.basicScene = new BasicScene({ dimension: 2, objects: [], canvas: this.canvas, renderer: toRaw(this.renderer), scene: toRaw(this.scene)}) // assuming basicScene already initialized to null
 
-      this.sceneSetup.sceneObjects.camera.position.z = 1000;
+      this.basicScene.sceneObjects.camera.position.z = 1000;
 
       this.nurbsObjs = []
-      this.nurbsObjs.push(new SurfaceObject({ threeScene: this.sceneSetup }))
-      this.sceneSetup.addObject(this.nurbsObjs.nurbsObj)
+      this.nurbsObjs.push(new SurfaceObject({ threeScene: this.basicScene, texturePath: '../img/uv_grid_opengl.jpg' }))
+      this.basicScene.addObject(this.nurbsObjs[0].nurbsObj)
 
-      this.grid = new THREE.GridHelper(10000, 250)
+      this.grid = new THREE.GridHelper(5000, 250)
       this.grid.rotation.x = Math.PI * 0.5
       this.grid.position.z = -1.1
-      this.sceneSetup.addObject(this.grid)
+      this.basicScene.addObject(this.grid)
+
+      this.initVueResizeObserver()
+      console.log(toRaw(this.basicScene))
+      this.basicScene.setupDragControls()
+      
     },
     renderScene() {
-      // this.sceneSetup.runRenderLoop(document, this.sceneSetup.defaultAnimateLoop())
-      // this.sceneSetup.defaultAnimateLoop()
-      if (this.sceneSetup.ctrlKeyPressed) {
-          this.sceneSetup.dragControls.transformGroup = false;
-      }
-      this.sceneSetup.sceneObjects.renderer.render(toRaw(this.sceneSetup.sceneObjects.scene), toRaw(this.sceneSetup.sceneObjects.camera));
+      // this.basicScene.runRenderLoop(document, this.basicScene.defaultAnimateLoop())
+      // // this.basicScene.defaultAnimateLoop()
+      // if (this.basicScene.ctrlKeyPressed) {
+      //     this.basicScene.dragControls.transformGroup = false;
+      // }
+      // toRaw(this.basicScene).sceneObjects.renderer.render(toRaw(this.basicScene.sceneObjects.scene), toRaw(this.basicScene.sceneObjects.camera));
+      // this.basicScene.sceneObjects.renderer.render(this.basicScene.sceneObjects.scene, this.basicScene.sceneObjects.camera);
+      console.log(toRaw(this.basicScene))
+
+
+      this.basicScene.runRenderLoop(document, () => {
+        if (this.basicScene.ctrlKeyPressed) {
+            this.basicScene.dragControls.transformGroup = false;
+        }
+        // this.grid.rotation.x += 0.1  // animation update check
+        this.basicScene.sceneObjects.renderer.render(toRaw(this.basicScene.sceneObjects.scene), toRaw(this.basicScene.sceneObjects.camera));
+      })
+      // toRaw(this.basicScene.sceneObjects.renderer).render(toRaw(this.basicScene.sceneObjects.scene), toRaw(this.basicScene.sceneObjects.camera));
+      
+      // const unproxy = toRaw(this.basicScene)
+      // unproxy.runRenderLoop(document, () => {
+      //   if (unproxy.ctrlKeyPressed) {
+      //       unproxy.dragControls.transformGroup = false;
+      //   }
+      //   unproxy.sceneObjects.renderer.render(unproxy.sceneObjects.scene, unproxy.sceneObjects.camera).bind(unproxy);
+      // })
+      // setTimeout(this.renderScene(), 17)  // ~60 fps
+    },
+    initVueResizeObserver() {
+      this.viewportResizeObserver = new ResizeObserver(entries => { 
+        // Resize the viewport for the first element, assuming it is the viewport canvas. 
+        for (let entry of entries) {
+          //console.log(entry);
+          switch (entry.target.id) {
+            case "surfaceEditorCanvas":
+              // Resize viewport
+              // onViewportResize(entry.target);
+              console.log(toRaw(this.basicScene.sceneObjects))
+              if (this.basicScene.onViewportResize(toRaw(this.basicScene.sceneObjects.renderer))) {
+                // If viewport gets resized, update camera params
+                const width = this.basicScene.sceneObjects.renderer.domElement.clientWidth
+                const height = this.basicScene.sceneObjects.renderer.domElement.clientHeight
+                
+                // adjust the FOV
+                //camera.fov = (360 / Math.PI) * Math.atan(tanFov * (window.innerHeight / initWindowHeight));
+                
+                // Update aspect ratio and Field of View accordingly
+                this.basicScene.sceneObjects.camera.aspect = width / height
+                if (this.basicScene.sceneObjects.camera instanceof THREE.PerspectiveCamera) {
+                  this.basicScene.sceneObjects.camera.fov = (360 / Math.PI) * Math.atan(this.basicScene.sceneParams.tanFov * (height / this.basicScene.sceneParams.initViewportHeight))
+                  this.basicScene.sceneObjects.camera.lookAt(this.basicScene.sceneObjects.scene.position)
+                }
+                else { //assuming only alternative is orthographic
+                  this.basicScene.sceneObjects.camera.right = width
+                  this.basicScene.sceneObjects.camera.top = height
+                }
+
+                this.basicScene.sceneObjects.camera.updateProjectionMatrix()
+              }
+              break;
+            default:
+              // Do nothing
+          }
+        }
+      })
+      this.viewportResizeObserver.observe(toRaw(this.canvas))
     }
   }
 }
 </script>
 
 <style scoped>
-#surface-editor {
+/* #surface-editor {
   position: absolute;
   z-index: -2;
   top: 46px;
@@ -350,6 +536,10 @@ export default {
   transform: translateX(-100%);
   transition: transform 0.3s ease-in-out;
   pointer-events: none;
+} */
+#surface-editor {
+  width: 100%;
+  height: 100%;
 }
 
 #surface-editor.se-visible {
@@ -361,7 +551,7 @@ export default {
   height: 22px;
 }
 
-#surfaceEditorContainer {
+#surfaceEditorCanvas {
   width: 100%;
   height: 100%;
   flex-grow: 1;
@@ -369,7 +559,7 @@ export default {
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   position: relative;
-  display: flex;
+  display: block;
   flex-direction: column;
 }
 
