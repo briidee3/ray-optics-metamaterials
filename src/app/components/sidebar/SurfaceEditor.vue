@@ -105,21 +105,21 @@
  * @module SurfaceEditor
  * @description The Vue component for the NURBS surface editor for use defining GRIN fields.
  */
-import { usePreferencesStore } from '../store/preferences'
+import { usePreferencesStore } from '../../store/preferences'
 import { toRef, ref, toRaw, markRaw, onMounted, onUnmounted, nextTick, watch, useTemplateRef } from 'vue'
 // import { jsonEditorService } from '../services/jsonEditor'
 // import { surfaceEditorService } from '../services/surfaceEditor'
 // import VisualTab from './sidebar/VisualTab.vue'
 // import AITab from './sidebar/AITab.vue'
-import BasicScene from '../components/nurbs-editor/src/utils/BasicScene'
-import SurfaceObject from '../components/nurbs-editor/src/utils/NURBSSurface'
+import BasicScene from '../nurbs-editor/src/utils/BasicScene'
+import SurfaceObject from '../nurbs-editor/src/utils/NURBSSurface'
 import * as THREE from 'three'
 
 export default {
   name: 'SurfaceEditor',
   // components: { VisualTab, AITab },
   components: { },
-  setup(props, { expose }) {
+  setup() {
     // if (this.basicScene) return
 
     // const canvas = document.querySelector("#surfaceEditorContainer")
@@ -313,14 +313,14 @@ export default {
     }
 
     // Resize and render the THREEjs scene for the surface editor
-    const showScene = () => {
-      // if (typeof basicScene !== 'undefined') {
-      //   resizeScene()
-      //   renderScene()
-      // } else {
-      //   console.log("SurfaceEditor.vue: Scene not yet created.")
-      // }
-    }
+    // const showScene = () => {
+    //   // if (typeof basicScene !== 'undefined') {
+    //   //   resizeScene()
+    //   //   renderScene()
+    //   // } else {
+    //   //   console.log("SurfaceEditor.vue: Scene not yet created.")
+    //   // }
+    // }
 
     watch(activeTab, (tab) => {
       if (tab === 'code') {
@@ -444,7 +444,7 @@ export default {
       this.grid = new THREE.GridHelper(5000, 250)
       this.grid.rotation.x = Math.PI * 0.5
       this.grid.position.z = -1.1
-      this.basicScene.addObject(this.grid)
+      this.basicScene.sceneObjects.scene.add(this.grid)
 
       this.initVueResizeObserver()
       console.log(toRaw(this.basicScene))
@@ -518,6 +518,10 @@ export default {
         }
       })
       this.viewportResizeObserver.observe(toRaw(this.canvas))
+    },
+    // Import lens into scene as an immovable object which cannot be interacted with
+    importLens(pdrosJsonObject) {
+      
     }
   }
 }

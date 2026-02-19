@@ -9,7 +9,7 @@
         :aria-selected="activeTabId === 'scene'"
         @click="activeTabId = 'scene'"
       >
-        {{ $t('simulator:sidebar.seSubTabs.scene') }}
+        {{ $t('simulator:sidebar.seSubTabs.toolsTitle') }}
       </button>
       <button
         type="button"
@@ -23,7 +23,7 @@
       </button>
     </div>
     <div class="se-subtab-content" role="tabpanel" @click="handleContentClick">
-      <SceneObjsEditor v-if="activeTabId === 'scene'" />
+      <SurfaceEditorTools v-if="activeTabId === 'scene'" />
       <SurfaceEditor v-else/>
       <!-- ="activeTabId === 'surfaceEditor'" /> -->
       <!-- <canvas class="surfaceEditorContainer"></canvas>> -->
@@ -47,15 +47,16 @@ import { computed, onMounted, onUnmounted, ref, toRef, watch } from 'vue'
 import i18next from 'i18next'
 import { useSceneStore } from '../../store/scene'
 import { app } from '../../services/app'
-import SceneObjsEditor from './SceneObjsEditor.vue'
+// import SceneObjsEditor from './SceneObjsEditor.vue'
 import ModuleEditor from './ModuleEditor.vue'
 import InfoPopoverIcon from '../InfoPopoverIcon.vue'
-import SurfaceEditor from '../SurfaceEditor.vue'
+import SurfaceEditor from './SurfaceEditor.vue'
 import { usePreferencesStore } from '../../store/preferences'
+import SurfaceEditorTools from './SurfaceEditorTools.vue'
 
 export default {
   name: 'SurfaceEditorTab',
-  components: { SceneObjsEditor, ModuleEditor, InfoPopoverIcon, SurfaceEditor },
+  components: { SurfaceEditorTools, ModuleEditor, InfoPopoverIcon, SurfaceEditor },
   setup() {
     const preferences = usePreferencesStore()
     const scene = useSceneStore()

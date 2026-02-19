@@ -45,28 +45,10 @@ class SurfaceEditorService {
   }
 
   /**
-   * Initialize the JSON editor with the given content
+   * Initialize the surface editor with the given content
    */
   initialize() {
-    if (this.sceneSetup) return
-
-    this.canvas = document.querySelector("#surfaceEditorContainer")
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas })
-    this.scene = new THREE.Scene()
-    this.sceneSetup = new BasicScene({ dimension: 2, objects: [], canvas: canvas, renderer: renderer, scene: scene})
-
-    sceneSetup.sceneObjects.camera.position.z = 1000;
-
-    this.nurbsObjs = []
-    this.nurbsObjs.push(new SurfaceObject({ threeScene: sceneSetup }))
-    sceneSetup.addObject(nurbsObj.nurbsObj)
-
-    const grid = new THREE.GridHelper(10000, 250)
-    grid.rotation.x = Math.PI * 0.5
-    grid.position.z = -1.1
-    sceneSetup.addObject(grid)
-
-    sceneSetup.runRenderLoop(document, sceneSetup.defaultAnimateLoop())
+    
   }
 
   /**
