@@ -619,7 +619,8 @@
       "tools": "Tools",
       "surfaceEditor": "Surface Editor",
       "importLensBoundary": "Import lens boundary from scene",
-      "toolsTitle": "Surface Editor Tools"
+      "toolsTitle": "Surface Editor Tools",
+      "moveToObj": "Move camera to lens (in Surface Editor)"
     },
     "sceneObjsEditor": {
       "moveIntoModule": "Move into module",
