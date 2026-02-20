@@ -25,6 +25,14 @@
       </span>
     </div>
     <div class="surface-editor-tools-body">
+      <button
+        type="button"
+        class="surface-editor-tools-move-cam-btn"
+        role="button"
+        @click="handleMoveCam"
+      >
+        {{ $t('simulator:sidebar.seSubTabs.moveToObj') }}
+      </button>
       <SurfaceEditorList
         :items="items"
         v-model:selectedIds="selectedIds"
@@ -36,7 +44,7 @@
         @hover="handleHover"
         @select="handleSelect"
         @selection-change="handleSelectionChange"
-        @enable-to="handleEnableTO"
+        @enable-to="handleToggleTO"
       >
         <template #content="{ item, index }">
           <SceneObjListItemContent :obj="item.obj" :index="index" />
@@ -52,12 +60,13 @@
 <script>
 import { computed, onMounted, onUnmounted, ref, toRef } from 'vue'
 import i18next from 'i18next'
-import SidebarItemList from './SidebarItemList.vue'
 import InfoPopoverIcon from '../InfoPopoverIcon.vue'
 import SceneObjListItemContent from './SceneObjListItemContent.vue'
 import SurfaceEditorList from './SurfaceEditorList.vue'
 import { useSceneStore } from '../../store/scene'
 import { app } from '../../services/app'
+import { jsonEditorService } from '../../services/jsonEditor'
+import { surfaceEditorService } from '../../services/surfaceEditor'
 
 export default {
   name: 'SurfaceEditorTools',
@@ -97,13 +106,26 @@ export default {
       sceneStore.duplicateObj(index)
     }
 
-    const handleReorder = ({ fromIndex, toIndex }) => {
-      sceneStore.reorderObjs(fromIndex, toIndex)
+    // Handle enabling transformation optics functionality
+    const handleToggleTO = ( item, index ) => {
+      // sceneStore.
+
+      // Add NURBS surface params to object's JSON
+      const json = JSON.parse(jsonEditorService.aceEditor.session.getValue())
+
+      if (json.objs[index].toEnabled) {
+        json.objs[index].toEnabled = false
+      } else {
+        json.objs[index].toEnabled = true
+      }
+
+      jsonEditorService.updateContent(JSON.stringify(json))
+      // jsonEditorService.handleEditorChange()
+      app.syncUrl()
     }
 
-    // Handle enabling transformation optics functionality
-    const handleEnableTO = ({ item, index }) => {
-      
+    const handleReorder = ({ fromIndex, toIndex }) => {
+      sceneStore.reorderObjs(fromIndex, toIndex)
     }
 
     const handleHover = ({ index }) => {
@@ -121,7 +143,22 @@ export default {
       }
       if (typeof index === 'number') {
         app.editor?.selectObj(index)
+        
+        // Set parameters for NURBS surface definition from the scene JSON, if they exist for the current object index
+        // const json = JSON.parse(jsonEditorService.aceEditor.getValue())
+        // if (json.objs[index].toSurfaceParams) {
+        //   surfaceEditorService.setParams(json.objs[index].toSurfaceParams)
+        // } else {
+        //   surfaceEditorService.setParams(surfaceEditorService.defaultParams)
+        // }
+
+        surfaceEditorService.setLensContext(index)
+
       }
+    }
+
+    const handleMoveCam = () => {
+      surfaceEditorService.moveCamToLens()
     }
 
     const handleSelectionChange = ({ selectedIds: nextSelectedIds }) => {
@@ -236,6 +273,8 @@ export default {
       handleSelectionChange,
       handleSceneTabClick,
       handleEditorClick,
+      handleToggleTO,
+      handleMoveCam,
       moduleNames,
       hasSelection,
       onMoveToModule,
