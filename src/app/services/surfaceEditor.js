@@ -24,6 +24,7 @@ import { app } from '../services/app'
 import BasicScene from '../components/nurbs-editor/src/utils/BasicScene'
 import SurfaceObject from '../components/nurbs-editor/src/utils/NURBSSurface'
 import * as THREE from 'three'
+import { jsonEditorService } from './jsonEditor'
 
 /**
  * Service to manage the NURBS surface editor instance and its interactions with the scene
@@ -82,6 +83,12 @@ class SurfaceEditorService {
         ]
       ]
     }
+
+    // Default material for lenses
+    this.lensMat = new THREE.MeshBasicMaterial({ color: 0xAAAAAA })
+
+    this.curLens = -1
+    this.pdrosObjInScene = false
   }
 
   /**
@@ -256,7 +263,7 @@ class SurfaceEditorService {
     console.log("canvas", this.canvas)
     this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: this.canvas })
     this.scene = new THREE.Scene()
-    this.basicScene = new BasicScene({ dimension: 2, objects: [], canvas: this.canvas, renderer: this.renderer, scene: this.scene}) // assuming basicScene already initialized to null
+    this.basicScene = new BasicScene({ dimension: 3, objects: [], canvas: this.canvas, renderer: this.renderer, scene: this.scene}) // assuming basicScene already initialized to null
 
     this.basicScene.sceneObjects.camera.position.z = 1000;
 
@@ -268,10 +275,10 @@ class SurfaceEditorService {
     }
     this.basicScene.addObject(this.nurbsObjs[0].nurbsObj)
 
-    this.grid = new THREE.GridHelper(5000, 250)
-    this.grid.rotation.x = Math.PI * 0.5
-    this.grid.position.z = -1.1
-    this.basicScene.sceneObjects.scene.add(this.grid)
+    // this.grid = new THREE.GridHelper(5000, 250)
+    // this.grid.rotation.x = Math.PI * 0.5
+    // this.grid.position.z = -1.1
+    // this.basicScene.sceneObjects.scene.add(this.grid)
 
     this.initVueResizeObserver()
     console.log(this.basicScene)
@@ -333,13 +340,71 @@ class SurfaceEditorService {
     this.viewportResizeObserver.observe(this.canvas)
   }
 
-  // Import lens into scene as an immovable object which cannot be interacted with
-  importLens(pdrosJsonObject) {
+  // Set which lens to be working on currently
+  setLensContext(index) {
+    if (!this.pdrosObjInScene) {
+      this.index = index
+    } else {
+      // Remove previous lens if one exists in the 3js scene
+      this.basicScene.sceneObjects.scene.remove(this.basicScene.sceneObjects.scene.getObjectByName("pdros-lens-" + String(this.index)))
+
+      this.index = index
+    }
     
+    this.curJsonState = JSON.parse(jsonEditorService.aceEditor.getValue())
+    this.curLensJson = this.curJsonState.objs[this.index]
+    console.log(this.curLensJson)
+
+    if (this.curLensJson.toEnabled) {   // check if GUI transformation optics enabled
+      this.updateLens(this.curLensJson)
+    } else {
+      console.warn("SurfaceEditorService: Warning! Current lens does not have transformation optics functionality enabled!\nTo enable, go to the \"Surface Editor\" tab in the sidebar.")
+    }
   }
 
-  updateNURBSObjs() {
-    // app.editor?.
+  // Import lens into scene as an immovable object which cannot be interacted with
+  importLens(pdrosJsonObject) {
+    if (pdrosJsonObject.type.includes("Glass") && pdrosJsonObject.type.includes("Grin")) {  // Only accept scene objects which already support gradient index fields
+      switch (pdrosJsonObject.type) {
+        case "CircleGrinGlass":
+          const center = pdrosJsonObject.p1
+          const radius = Math.sqrt(Math.pow((pdrosJsonObject.p2.x - pdrosJsonObject.p1.x), 2) + Math.pow((pdrosJsonObject.p2.y - pdrosJsonObject.p1.y), 2))
+          const geom = new THREE.CircleGeometry({radius: radius})
+          console.log(radius)
+          this.curLensThreeObj = new THREE.Mesh(geom, this.lensMat)
+          this.curLensThreeObj.position.set(center.x, center.y, -1)   // -1 to put it behind the NURBS surface
+          this.curLensThreeObj.name = "pdros-lens-" + String(this.index)
+
+          // Add to scene, but not to DragControls; let the lens and its position only be manipulated from within the primary editor of PDROS
+          this.basicScene.sceneObjects.scene.add(this.curLensThreeObj)
+          // this.basicScene.objects.add(obj)
+
+          break;
+        case "CurveGrinGlass":
+          break;
+        case "GrinGlass":
+          break;
+        case "ParamGrinGlass":
+          break;
+        default:
+          throw new Error("SurfaceEditorService.importLens: Could not import lens; lens does not supported or doesn't support GRIN")
+      }
+    }
+  }
+
+  updateLens(pdrosJsonObject) {
+    // Check for lens in surface editor
+    if (this.basicScene.sceneObjects.scene.getObjectByName("pdros-lens-" + String(this.index))) {
+      // Remove it if it's there
+      this.basicScene.sceneObjects.scene.remove(this.basicScene.sceneObjects.scene.getObjectByName("pdros-lens-" + String(this.index)))
+    }
+
+    this.importLens(pdrosJsonObject)
+  }
+
+  // Update the NURBS obj for the current lens in the JSON representation of the PDROS scene
+  updateJson(index) {
+    // jsonEditorService.
   }
 
   getNURBSObjs() {
@@ -347,11 +412,20 @@ class SurfaceEditorService {
   }
 
   setNURBSObjs(nurbsParams) {
-    
+    // this.nurbsObjs = 
   }
-  
+
   setSceneObj(obj, index) {
     
+  }
+
+  moveCamToLens() {
+    if (this.curLensThreeObj) {
+      this.basicScene.sceneObjects.camera.position.x = this.curLensThreeObj.x
+      this.basicScene.sceneObjects.camera.position.y = this.curLensThreeObj.y
+    } else {
+
+    }
   }
 }
 
