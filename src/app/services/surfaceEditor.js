@@ -26,6 +26,8 @@ import SurfaceObject from '../components/nurbs-editor/src/utils/NURBSSurface'
 import * as THREE from 'three'
 import { jsonEditorService } from './jsonEditor'
 
+const meshResolutionModifier = 1    // Multiplier for mesh resolution, e.g. number of faces in a circle mesh
+
 /**
  * Service to manage the NURBS surface editor instance and its interactions with the scene
  */
@@ -85,10 +87,27 @@ class SurfaceEditorService {
     }
 
     // Default material for lenses
-    this.lensMat = new THREE.MeshBasicMaterial({ color: 0xAAAAAA })
+    this.lensMat = new THREE.MeshBasicMaterial({ color: 0xAAAAAA, side: THREE.DoubleSide })
+    this.lineMat = new THREE.LineBasicMaterial( { color: 0xAAAAAA, side: THREE.DoubleSide } );
 
     this.curLens = -1
     this.pdrosObjInScene = false
+
+    this.canvas = document.createElement("canvas")
+    this.canvas.setAttribute("id", "surfaceEditorCanvas")
+    this.canvas.setAttribute("style", `
+      width: 100%;
+      height: 100%;
+      flex-grow: 1;
+      background-color:rgba(45, 51, 57,0.8);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      position: relative;
+      display: block;
+      flex-direction: column;
+    `)
+
+    this.sceneSetup = this.createSESession()
   }
 
   /**
@@ -217,18 +236,6 @@ class SurfaceEditorService {
   //   }
   // }
 
-  setParams(params, index) {
-    if (index) {
-      if (this.nurbsObjs.length < index){
-        this.nurbsObjs[index].updateNurbs(params)
-      }
-    } else if (this.nurbsObjs.length > 0) {
-      this.nurbsObjs[0].updateNurbs(params)
-    } else {
-      this.nurbsObjs.push(new SurfaceObject())
-    }
-  }
-
   // Based loosely on ace.js' edit function
   setContainer(id_) {
     // if (typeof el === "string") {
@@ -240,22 +247,7 @@ class SurfaceEditorService {
     // }
 
     // if (el && el.env && el.env.surfaceEditor instanceof SurfaceEditor)
-    this.canvas = document.createElement("canvas")
-    this.canvas.setAttribute("id", "surfaceEditorCanvas")
-    this.canvas.setAttribute("style", `
-      width: 100%;
-      height: 100%;
-      flex-grow: 1;
-      background-color:rgba(45, 51, 57,0.8);
-      backdrop-filter: blur(2px);
-      -webkit-backdrop-filter: blur(2px);
-      position: relative;
-      display: block;
-      flex-direction: column;
-    `)
     el.appendChild(this.canvas)
-
-    this.sceneSetup = this.createSESession()
   }
 
   createSESession(nurbsObjs) {
@@ -263,7 +255,7 @@ class SurfaceEditorService {
     console.log("canvas", this.canvas)
     this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: this.canvas })
     this.scene = new THREE.Scene()
-    this.basicScene = new BasicScene({ dimension: 3, objects: [], canvas: this.canvas, renderer: this.renderer, scene: this.scene}) // assuming basicScene already initialized to null
+    this.basicScene = new BasicScene({ dimension: 2, objects: [], canvas: this.canvas, renderer: this.renderer, scene: this.scene}) // assuming basicScene already initialized to null
 
     this.basicScene.sceneObjects.camera.position.z = 1000;
 
@@ -271,7 +263,7 @@ class SurfaceEditorService {
       this.nurbsObjs = nurbsObjs
     } else {
       this.nurbsObjs = []
-      this.nurbsObjs.push(new SurfaceObject({ threeScene: this.basicScene, texturePath: '../img/uv_grid_opengl.jpg' }))
+      this.nurbsObjs.push(new SurfaceObject({ threeScene: this.basicScene, texturePath: '../img/uv_grid_opengl.jpg', geomResolution: 50 * meshResolutionModifier }))
     }
     this.basicScene.addObject(this.nurbsObjs[0].nurbsObj)
 
@@ -281,8 +273,12 @@ class SurfaceEditorService {
     // this.basicScene.sceneObjects.scene.add(this.grid)
 
     this.initVueResizeObserver()
-    console.log(this.basicScene)
     this.basicScene.setupDragControls()
+
+    // Handle updates to JSON of object of focus when NURBS surface is edited
+    this.canvas.addEventListener("nurbs-surface-updated", (e) => {
+      this.updateJson(e.detail.surfaceObj.nurbsParams)
+    })
   }
 
   renderScene() {
@@ -353,35 +349,59 @@ class SurfaceEditorService {
     
     this.curJsonState = JSON.parse(jsonEditorService.aceEditor.getValue())
     this.curLensJson = this.curJsonState.objs[this.index]
-    console.log(this.curLensJson)
 
     if (this.curLensJson.toEnabled) {   // check if GUI transformation optics enabled
-      this.updateLens(this.curLensJson)
+      this.seUpdateLens(this.curLensJson)
     } else {
       console.warn("SurfaceEditorService: Warning! Current lens does not have transformation optics functionality enabled!\nTo enable, go to the \"Surface Editor\" tab in the sidebar.")
     }
   }
 
   // Import lens into scene as an immovable object which cannot be interacted with
-  importLens(pdrosJsonObject) {
+  seImportLens(pdrosJsonObject) {
     if (pdrosJsonObject.type.includes("Glass") && pdrosJsonObject.type.includes("Grin")) {  // Only accept scene objects which already support gradient index fields
+      this.curLensThreeObj = []
       switch (pdrosJsonObject.type) {
-        case "CircleGrinGlass":
+        case "CircleGrinGlass": {
           const center = pdrosJsonObject.p1
-          const radius = Math.sqrt(Math.pow((pdrosJsonObject.p2.x - pdrosJsonObject.p1.x), 2) + Math.pow((pdrosJsonObject.p2.y - pdrosJsonObject.p1.y), 2))
-          const geom = new THREE.CircleGeometry({radius: radius})
-          console.log(radius)
-          this.curLensThreeObj = new THREE.Mesh(geom, this.lensMat)
-          this.curLensThreeObj.position.set(center.x, center.y, -1)   // -1 to put it behind the NURBS surface
-          this.curLensThreeObj.name = "pdros-lens-" + String(this.index)
+          const r = Math.sqrt(Math.pow((pdrosJsonObject.p2.x - pdrosJsonObject.p1.x), 2) + Math.pow((pdrosJsonObject.p2.y - pdrosJsonObject.p1.y), 2))
+          const geom = new THREE.RingGeometry(r - 10, r, 48 * meshResolutionModifier)
+          this.curLensThreeObj[0] = new THREE.Mesh(geom, this.lensMat)
+          this.curLensThreeObj[0].position.set(center.x, -center.y, -1)   // -1 to put it behind the NURBS surface
+          this.curLensThreeObj[0].name = "pdros-lens-" + String(this.index)
 
           // Add to scene, but not to DragControls; let the lens and its position only be manipulated from within the primary editor of PDROS
-          this.basicScene.sceneObjects.scene.add(this.curLensThreeObj)
+          this.basicScene.sceneObjects.scene.add(this.curLensThreeObj[0])
           // this.basicScene.objects.add(obj)
 
           break;
-        case "CurveGrinGlass":
+        }
+        case "CurveGrinGlass": {
+          // const geom  = 
+          const curves = []
+          const curvesGeoms = []
+          const curvesMats = []
+          const curvesMeshes = []
+          for (let i = 0; i < pdrosJsonObject.points.length; i++) {
+            // Y-axis is flipped relative to the PDROS coords system
+            curves.push(new THREE.CubicBezierCurve(
+              new THREE.Vector2(pdrosJsonObject.points[i].a1.x, -pdrosJsonObject.points[i].a1.y), 
+              new THREE.Vector2(pdrosJsonObject.points[i].c1.x, -pdrosJsonObject.points[i].c1.y), 
+              new THREE.Vector2(pdrosJsonObject.points[i].c2.x, -pdrosJsonObject.points[i].c2.y), 
+              new THREE.Vector2(pdrosJsonObject.points[(i + 1) % pdrosJsonObject.points.length].a1.x, -pdrosJsonObject.points[(i + 1) % pdrosJsonObject.points.length].a1.y), 
+            ))
+            const curIndex = curves.length - 1
+            curvesGeoms.push(new THREE.BufferGeometry().setFromPoints( curves[curIndex].getPoints(50 * meshResolutionModifier) ))
+            // Create the final object to add to the scene
+            curvesMeshes.push(new THREE.Line( curvesGeoms[curIndex], this.lineMat ))
+            curvesMeshes[curIndex].name = "pdros-lens-" + String(this.index) + "-" + String(i)
+
+            this.curLensThreeObj.push(curvesMeshes[curIndex])
+            this.basicScene.sceneObjects.scene.add(this.curLensThreeObj[curIndex])
+          }
+        
           break;
+        }
         case "GrinGlass":
           break;
         case "ParamGrinGlass":
@@ -392,19 +412,47 @@ class SurfaceEditorService {
     }
   }
 
-  updateLens(pdrosJsonObject) {
-    // Check for lens in surface editor
-    if (this.basicScene.sceneObjects.scene.getObjectByName("pdros-lens-" + String(this.index))) {
-      // Remove it if it's there
-      this.basicScene.sceneObjects.scene.remove(this.basicScene.sceneObjects.scene.getObjectByName("pdros-lens-" + String(this.index)))
-    }
+  seUpdateLens(pdrosJsonObject) {
+    var cur = this.basicScene.sceneObjects.scene.getObjectByName("pdros-lens-" + String(this.index))
+    while (typeof cur !== 'undefined') {  // Lens may be multiple parts, e.g. multiple curves bounding a lens, so account for that here
+      if (cur) {
+        // Remove it if it's there
+        this.basicScene.sceneObjects.scene.remove(this.basicScene.sceneObjects.scene.getObjectByName("pdros-lens-" + String(this.index)))
+      }
 
-    this.importLens(pdrosJsonObject)
+      cur = this.basicScene.sceneObjects.scene.getObjectByName("pdros-lens-" + String(this.index))
+    }
+    this.seImportLens(pdrosJsonObject)
+  }
+
+  setNurbsParams(params, index) {
+    if (!index) { index = 0 }
+
+    if (this.nurbsObjs.length > index){
+      this.nurbsObjs[index].updateNurbs(params)
+    } else if (this.nurbsObjs.length < index) {
+      this.nurbsObjs.push(new SurfaceObject({ nurbsParams: params, threeScene: this.basicScene, texturePath: '../img/uv_grid_opengl.jpg', geomResolution: 50 * meshResolutionModifier }))
+      return this.nurbsObjs.length - 1
+    } else {
+      this.nurbsObjs[0].updateNurbs(params)
+    }
+    return index
   }
 
   // Update the NURBS obj for the current lens in the JSON representation of the PDROS scene
-  updateJson(index) {
-    // jsonEditorService.
+  updateJson(params) {
+    console.log(this.curLensJson)
+    if (this.curLensJson) {
+      // Add NURBS surface params to object's JSON
+      if (this.curLensJson.toEnabled) {
+        this.curJsonState.objs[this.index].toNurbsSurfaceParams = params
+      }
+
+      jsonEditorService.updateContent(JSON.stringify(this.curJsonState, null, 2))
+      app.syncUrl()
+    } else {
+      console.warn("surfaceEditor.updateJson: No lens selected for surface editor")
+    }
   }
 
   getNURBSObjs() {
@@ -421,8 +469,8 @@ class SurfaceEditorService {
 
   moveCamToLens() {
     if (this.curLensThreeObj) {
-      this.basicScene.sceneObjects.camera.position.x = this.curLensThreeObj.x
-      this.basicScene.sceneObjects.camera.position.y = this.curLensThreeObj.y
+      this.basicScene.sceneObjects.camera.position.x = this.curLensThreeObj[0].x
+      this.basicScene.sceneObjects.camera.position.y = this.curLensThreeObj[0].y
     } else {
 
     }

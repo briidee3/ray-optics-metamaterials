@@ -108,9 +108,6 @@ export default {
 
     // Handle enabling transformation optics functionality
     const handleToggleTO = ( item, index ) => {
-      // sceneStore.
-
-      // Add NURBS surface params to object's JSON
       const json = JSON.parse(jsonEditorService.aceEditor.session.getValue())
 
       if (json.objs[index].toEnabled) {
@@ -119,8 +116,7 @@ export default {
         json.objs[index].toEnabled = true
       }
 
-      jsonEditorService.updateContent(JSON.stringify(json))
-      // jsonEditorService.handleEditorChange()
+      jsonEditorService.updateContent(JSON.stringify(json, null, 2))
       app.syncUrl()
     }
 
