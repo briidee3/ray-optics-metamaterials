@@ -449,6 +449,7 @@ class SurfaceEditorService {
       }
 
       jsonEditorService.updateContent(JSON.stringify(this.curJsonState, null, 2))
+      jsonEditorService.parse()
       app.syncUrl()
     } else {
       console.warn("surfaceEditor.updateJson: No lens selected for surface editor")
@@ -469,8 +470,7 @@ class SurfaceEditorService {
 
   moveCamToLens() {
     if (this.curLensThreeObj) {
-      this.basicScene.sceneObjects.camera.position.x = this.curLensThreeObj[0].x
-      this.basicScene.sceneObjects.camera.position.y = this.curLensThreeObj[0].y
+      this.basicScene.sceneObjects.camera.position.set(this.curLensThreeObj[0].x, this.curLensThreeObj[0].y)
     } else {
 
     }

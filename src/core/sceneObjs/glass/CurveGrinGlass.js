@@ -36,6 +36,8 @@ import { Bezier, PolyBezier } from 'bezier-js';
  * @property {Point} origin - The origin of the (x,y) coordinates used in the refractive index function.
  * @property {number} stepSize - The step size for the ray trajectory equation.
  * @property {number} intersectTol - Tolerance for intersection calculations (unit: pixels).
+ * @property {boolean} toEnabled - Toggle for transformation optics functionality with the surface editor
+ * @property {object} toNurbsSurfaceParams - NURBS Surface parameters for defining coordinates for use with transformation optics
  */
 class CurveGrinGlass extends BaseGrinGlass {
   static type = 'CurveGrinGlass';
@@ -49,7 +51,9 @@ class CurveGrinGlass extends BaseGrinGlass {
     origin: { x: 0, y: 0 },
     stepSize: 1,
     intersectTol: 5e-2,
-    partialReflect: true
+    partialReflect: true,
+    toEnabled: false,
+    toNurbsSurfaceParams: {}
   }
   
   /**
