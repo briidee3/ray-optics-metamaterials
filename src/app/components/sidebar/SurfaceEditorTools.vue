@@ -120,6 +120,11 @@ export default {
       app.syncUrl()
     }
 
+    // Handle setting up lattice of boxes with different indices, given a matrix of indices of refraction
+    // const handleIndexMatrixModule = ( indexMatrix, origin ) {
+      
+    // }
+
     const handleReorder = ({ fromIndex, toIndex }) => {
       sceneStore.reorderObjs(fromIndex, toIndex)
     }
