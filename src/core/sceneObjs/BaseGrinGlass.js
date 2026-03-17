@@ -21,6 +21,9 @@ import i18next from 'i18next';
 import { evaluateLatex } from '../equation.js';
 import { parseTex } from 'tex-math-parser'
 import * as math from 'mathjs';
+// import { SurfaceObject, calcNearestSurfacePointFromPoint, calcNURBSSurfaceDerivatives, isColliding } from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
+import SurfaceObject from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
+import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
 
 /**
  * @typedef {Object} BodyMergingObj
@@ -46,6 +49,8 @@ import * as math from 'mathjs';
  * @property {function} fn_p_der_y - The evaluatex function for `p_der_y`, where (x,y) has been shifted to the absolute coordinates.
  * @property {number} stepSize - The step size for the ray trajectory equation.
  * @property {number} intersectTol - The epsilon for the intersection calculations.
+ * @property {boolean} toEnabled - Toggle for transformation optics functionality with the surface editor
+ * @property {object} toNurbsSurfaceParams - NURBS Surface parameters for defining coordinates for use with transformation optics
  */
 class BaseGrinGlass extends BaseGlass {
 
@@ -319,27 +324,122 @@ class BaseGrinGlass extends BaseGlass {
    * @param {Ray} ray
    */
   step(p1, p2, ray) {
-    const len = geometry.distance(p1, p2);
-    const x = p2.x;
-    const y = p2.y;
-    const x_der_s_prev = (p2.x - p1.x) / len;
-    const y_der_s_prev = Math.sign(p2.y - p1.y) * Math.sqrt(1 - x_der_s_prev ** 2);
+    if (this.toEnabled && this.toNurbsSurfaceParams) {  // A more efficient way of doing this, e.g. changing which function is used at the moment toEnabled is set to true (or false), should be added eventually. Forsaken temporarily for testing and time constraints
+      // Transformation optics functionality enabled
+      return this.stepTO(p1, p2, ray);
+    } else {
+      const len = geometry.distance(p1, p2);
+      const x = p2.x;
+      const y = p2.y;
+      const x_der_s_prev = (p2.x - p1.x) / len;
+      const y_der_s_prev = Math.sign(p2.y - p1.y) * Math.sqrt(1 - x_der_s_prev ** 2);
 
-    const x_der_s = x_der_s_prev + this.stepSize * (ray.bodyMergingObj.fn_p_der_x({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH }) * (1 - x_der_s_prev ** 2) - ray.bodyMergingObj.fn_p_der_y({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH }) * x_der_s_prev * y_der_s_prev) / ray.bodyMergingObj.fn_p({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
-    const y_der_s = y_der_s_prev + this.stepSize * (ray.bodyMergingObj.fn_p_der_y({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH }) * (1 - y_der_s_prev ** 2) - ray.bodyMergingObj.fn_p_der_x({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH }) * x_der_s_prev * y_der_s_prev) / ray.bodyMergingObj.fn_p({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
+      const x_der_s = x_der_s_prev + this.stepSize * (ray.bodyMergingObj.fn_p_der_x({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH }) * (1 - x_der_s_prev ** 2) - ray.bodyMergingObj.fn_p_der_y({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH }) * x_der_s_prev * y_der_s_prev) / ray.bodyMergingObj.fn_p({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
+      const y_der_s = y_der_s_prev + this.stepSize * (ray.bodyMergingObj.fn_p_der_y({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH }) * (1 - y_der_s_prev ** 2) - ray.bodyMergingObj.fn_p_der_x({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH }) * x_der_s_prev * y_der_s_prev) / ray.bodyMergingObj.fn_p({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
 
-    const x_new = x + this.stepSize * x_der_s;
-    const y_new = y + this.stepSize * y_der_s;
+      const x_new = x + this.stepSize * x_der_s;
+      const y_new = y + this.stepSize * y_der_s;
 
-    // Absorption
-    const alpha = ray.bodyMergingObj.fn_alpha({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
-    const absorption = Math.exp(-alpha * this.stepSize);
+      // Absorption
+      const alpha = ray.bodyMergingObj.fn_alpha({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
+      const absorption = Math.exp(-alpha * this.stepSize);
 
-    ray.brightness_s *= absorption;
-    ray.brightness_p *= absorption;
+      ray.brightness_s *= absorption;
+      ray.brightness_p *= absorption;
 
-    return geometry.point(x_new, y_new);
+      return geometry.point(x_new, y_new);
+    }
   }
+
+  /**
+   * Takes two points in a lens and returns the next point to where the ray, connecting these two points, will travel, based on the math of transformation optics (https://doi.org/10.1002/lpor.201700034) and NURBS surfaces (https://doi.org/10.1007/978-3-642-59223-2).
+   * Currently ignoring absorption.
+   * Ref: https://doi.org/10.3390/app11030912, https://doi.org/10.1007/978-1-4471-4996-5
+   * @param {Point} p1
+   * @param {Point} p2
+   * @param {Ray} ray
+   */
+  stepTO(p1, p2, ray) {
+    const d = 1; // Number of derivatives to calculate for each of the uv coords in the NURBS surface (i.e. d=1 => partial of u, partial of v, and partial of both)
+    const tol = 0.0001; // tolerance for finding (u,v) which correlates to (x,y)
+    const maxIterations = 60; // Maximum number of iterations for the process of finding u and v for the point (x,y)
+    
+    const surfaceDerivs = SurfaceObject.calcNURBSSurfaceDerivativesXYZ(p1, d, tol, maxIterations, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
+
+    const u = surfaceDerivs[1][0];
+    const v = surfaceDerivs[1][1];
+
+    const partialU = surfaceDerivs[1][1][0];
+    const partialV = surfaceDerivs[1][0][1];
+
+    const incidentLen = geometry.distance(p1, p2);
+    const incidentUnitVec = {
+      x: (p2.x - p1.x) / incidentLen,
+      y: (p2.y - p1.y) / incidentLen
+    };
+    
+    const b = partialU.x * partialU.y + partialV.x * partialV.y;
+    const transformationMatrix = [
+      [
+        Math.pow(partialU.x, 2) + Math.pow(partialV.x, 2),
+        b
+      ],
+      [
+        b,
+        Math.pow(partialU.y, 2) + Math.pow(partialV.y, 2)
+      ]
+    ];
+    const transformationMatrixInv = [
+      [
+        Math.pow(partialU.y, 2) + Math.pow(partialV.y, 2),
+        -b
+      ],
+      [
+        -b,
+        Math.pow(partialU.x, 2) + Math.pow(partialV.x, 2)
+      ]
+    ];
+    const determinant = transformationMatrix[0][0] * transformationMatrix[1][1] - Math.pow(b, 2);
+    
+    // Assuming n outside the lens (i.e. where there is no lens) is equal to 1, and that permittivity is equal to permeability => n = sqrt(permittivity^2) = permittivity = 1
+    const refractedVec = {
+      x: transformationMatrixInv[0][0] * incidentUnitVec.x - b * incidentUnitVec.y,
+      y: -b * incidentUnitVec.x + transformationMatrixInv[1][1] * incidentUnitVec.y
+    };
+    console.log("Length of refracted vec: " + Number(Math.pow(refractedVec.x, 2) + Math.pow(refractedVec.y, 2)).toString());
+    
+    return geometry.point(refractedVec.x + p1.x, refractedVec.y + p1.y);
+  }
+
+  /**
+   * Update the local NURBS surface instance when toNurbsSurfaceParams is updated
+   * @param {Object} nurbsParams
+   */
+  updateNURBSObj(nurbsParams) { 
+    this.toNurbsSurfaceParams = nurbsParams;
+    // this.toNurbsSurfaceObj = new SurfaceObject({ nurbsParams: this.toNurbsSurfaceParams });   // Saved separately from the GUI one since the GUI one is overwritten a lot
+
+    // Used to get points on the NURBS surface, given (u,v) coords. Can be done more efficiently using a custom implementation, but this has been skipped temporarily for sake of time.
+    this.toNurbsSurfaceObj = new NURBSSurface( this.toNurbsSurfaceParams.nurbsParams.degree1, this.toNurbsSurfaceParams.nurbsParams.degree2, this.toNurbsSurfaceParams.nurbsParams.knots1, this.toNurbsSurfaceParams.nurbsParams.knots2, this.toNurbsSurfaceParams.nurbsParams.ctrlPts );
+  }
+  
+  // calcNURBSSurfaceDerivativesXYZ(point, d, tol, maxIt, nurbsPosition, nurbsParams, threeSurfaceObj) {
+  //     const surfaceObj = {};
+  //     if (!threeSurfaceObj) surfaceObj["obj"] = new NURBSSurface( nurbsParams.degree1, nurbsParams.degree2, nurbsParams.knots1, nurbsParams.knots2, nurbsParams.ctrlPts );
+  //     else surfaceObj["obj"] = threeSurfaceObj;
+  
+  //     // Offset p by the nurbsObj's position
+  //     const p = point.clone();
+  //     p.sub(nurbsPosition);
+  //     // console.log(p);
+  
+  //     const tol_ = tol || 0.000001;
+  //     const minDistForUnitVectors = tol_ / 2;
+  //     const maxIterations = maxIt || 60;
+  //     const uvCoords = calcNearestSurfacePointFromPoint(minDistForUnitVectors, tol_, maxIterations, p, 0.5, threeSurfaceObj );
+  
+  //     return calcNURBSSurfaceDerivatives(uvCoords[0], uvCoords[1], d, nurbsParams);
+  // }
 
 
 
