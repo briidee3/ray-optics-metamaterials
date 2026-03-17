@@ -444,9 +444,10 @@ class SurfaceEditorService {
     console.log(this.curLensJson)
     if (this.curLensJson) {
       // Add NURBS surface params to object's JSON
-      if (this.curLensJson.toEnabled) {
-        this.curJsonState.objs[this.index].toNurbsSurfaceParams = params
-      }
+      // if (this.curLensJson.toEnabled) {
+      this.curJsonState.objs[this.index].toNurbsSurfaceParams = { nurbsParams: params, nurbsPos: this.nurbsObjs[this.index].nurbsObj.position }
+      // }
+      // this.curJsonState.objs[this.index].toNurbsSurfaceObj = this.nurbsObjs[this.index]
 
       jsonEditorService.updateContent(JSON.stringify(this.curJsonState, null, 2))
       jsonEditorService.parse()
