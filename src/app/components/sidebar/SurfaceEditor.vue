@@ -56,9 +56,9 @@ import { toRef, ref, toRaw, markRaw, onMounted, onUnmounted, nextTick, watch, us
 // import { surfaceEditorService } from '../services/surfaceEditor'
 // import VisualTab from './sidebar/VisualTab.vue'
 // import AITab from './sidebar/AITab.vue'
-import BasicScene from '../nurbs-editor/src/utils/BasicScene'
-import SurfaceObject from '../nurbs-editor/src/utils/NURBSSurface'
-import * as THREE from 'three'
+// import BasicScene from '../nurbs-editor/src/utils/BasicScene'
+// import SurfaceObject from '../nurbs-editor/src/utils/NURBSSurface'
+// import * as THREE from 'three'
 import { surfaceEditorService } from '../../services/surfaceEditor'
 
 export default {

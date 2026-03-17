@@ -32,6 +32,8 @@ import geometry from '../../geometry.js';
  * @property {Point} origin - The origin of the (x,y) coordinates used in the refractive index function.
  * @property {number} stepSize - The step size for the ray trajectory equation.
  * @property {number} intersectTol - The epsilon for the intersection calculations.
+ * @property {boolean} toEnabled - Toggle for transformation optics functionality with the surface editor
+ * @property {object} toNurbsSurfaceParams - NURBS Surface parameters for defining coordinates for use with transformation optics
  */
 class CircleGrinGlass extends CircleObjMixin(BaseGrinGlass) {
   static type = 'CircleGrinGlass';
@@ -45,7 +47,9 @@ class CircleGrinGlass extends CircleObjMixin(BaseGrinGlass) {
     origin: { x: 0, y: 0 },
     stepSize: 1,
     intersectTol: 1e-3,
-    partialReflect: true
+    partialReflect: true,
+    toEnabled: false,
+    toNurbsSurfaceParams: {}
   };
 
   populateObjBar(objBar) {

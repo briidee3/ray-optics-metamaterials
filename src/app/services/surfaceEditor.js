@@ -444,11 +444,13 @@ class SurfaceEditorService {
     console.log(this.curLensJson)
     if (this.curLensJson) {
       // Add NURBS surface params to object's JSON
-      if (this.curLensJson.toEnabled) {
-        this.curJsonState.objs[this.index].toNurbsSurfaceParams = params
-      }
+      // if (this.curLensJson.toEnabled) {
+      this.curJsonState.objs[this.index].toNurbsSurfaceParams = { nurbsParams: params, nurbsPos: this.nurbsObjs[this.index].nurbsObj.position }
+      // }
+      // this.curJsonState.objs[this.index].toNurbsSurfaceObj = this.nurbsObjs[this.index]
 
       jsonEditorService.updateContent(JSON.stringify(this.curJsonState, null, 2))
+      jsonEditorService.parse()
       app.syncUrl()
     } else {
       console.warn("surfaceEditor.updateJson: No lens selected for surface editor")
@@ -469,8 +471,7 @@ class SurfaceEditorService {
 
   moveCamToLens() {
     if (this.curLensThreeObj) {
-      this.basicScene.sceneObjects.camera.position.x = this.curLensThreeObj[0].x
-      this.basicScene.sceneObjects.camera.position.y = this.curLensThreeObj[0].y
+      this.basicScene.sceneObjects.camera.position.set(this.curLensThreeObj[0].x, this.curLensThreeObj[0].y)
     } else {
 
     }
