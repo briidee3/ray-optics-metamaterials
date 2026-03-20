@@ -21,8 +21,10 @@ import i18next from 'i18next';
 import { evaluateLatex } from '../equation.js';
 import { parseTex } from 'tex-math-parser'
 import * as math from 'mathjs';
-// import { SurfaceObject, calcNearestSurfacePointFromPoint, calcNURBSSurfaceDerivatives, isColliding } from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
-import SurfaceObject from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
+import { SurfaceObject, calcNearestSurfacePointFromPoint, calcNURBSSurfaceDerivativesXYZ, isColliding } from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
+// import * as surfaceObj from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
+// import { SurfaceObject } from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
+// import SurfaceObject from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
 import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
 
 /**
@@ -51,6 +53,7 @@ import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
  * @property {number} intersectTol - The epsilon for the intersection calculations.
  * @property {boolean} toEnabled - Toggle for transformation optics functionality with the surface editor
  * @property {object} toNurbsSurfaceParams - NURBS Surface parameters for defining coordinates for use with transformation optics
+ * @property {object} toNurbsSurfaceObj - SurfaceObject instance used for calculations with regards to the NURBS surface
  */
 class BaseGrinGlass extends BaseGlass {
 
@@ -173,6 +176,16 @@ class BaseGrinGlass extends BaseGlass {
       delete this.fn_p_der_y;
       delete this.fn_alpha;
       this.error = e.toString();
+    }
+
+    // Transformation Optics initialization
+    try {
+      if (this.toNurbsSurfaceParams) {
+        // this.updateNURBSObj(this.toNurbsSurfaceParams.nurbsParams);
+        this.updateNURBSObj();
+      }
+    } catch (e) {
+      console.error(e.toString());
     }
   }
 
@@ -360,67 +373,124 @@ class BaseGrinGlass extends BaseGlass {
    * @param {Ray} ray
    */
   stepTO(p1, p2, ray) {
-    const d = 1; // Number of derivatives to calculate for each of the uv coords in the NURBS surface (i.e. d=1 => partial of u, partial of v, and partial of both)
-    const tol = 0.0001; // tolerance for finding (u,v) which correlates to (x,y)
-    const maxIterations = 60; // Maximum number of iterations for the process of finding u and v for the point (x,y)
-    
-    const surfaceDerivs = SurfaceObject.calcNURBSSurfaceDerivativesXYZ(p1, d, tol, maxIterations, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
+    // Taken directly from step() above
+    const len = geometry.distance(p1, p2);
+    const x = p2.x;
+    const y = p2.y;
+    const x_der_s_prev = (p2.x - p1.x) / len;
+    const y_der_s_prev = Math.sign(p2.y - p1.y) * Math.sqrt(1 - x_der_s_prev ** 2);
 
-    const u = surfaceDerivs[1][0];
-    const v = surfaceDerivs[1][1];
+    try {
+      // Update NURBS surface instance
+      if (!this.toNurbsSurfaceObj) {
+        this.updateNURBSObj();
+      }
+      const nd = 1; // Number of derivatives to calculate for each of the uv coords in the NURBS surface (i.e. d=1 => partial of u, partial of v, and partial of both)
+      const tol = 0.0001; // tolerance for finding (u,v) which correlates to (x,y)
+      const maxIterations = 60; // Maximum number of iterations for the process of finding u and v for the point (x,y)
+      
+      const surfaceDerivs = calcNURBSSurfaceDerivativesXYZ(p1, nd, tol, maxIterations, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
 
-    const partialU = surfaceDerivs[1][1][0];
-    const partialV = surfaceDerivs[1][0][1];
+      const u = surfaceDerivs.uvCoords[0];
+      const v = surfaceDerivs.uvCoords[1];
 
-    const incidentLen = geometry.distance(p1, p2);
-    const incidentUnitVec = {
-      x: (p2.x - p1.x) / incidentLen,
-      y: (p2.y - p1.y) / incidentLen
-    };
+      const s_ux = surfaceDerivs.derivs[1][0].x;
+      const s_uy = surfaceDerivs.derivs[1][0].y;
+      const s_vx = surfaceDerivs.derivs[0][1].x;
+      const s_vy = surfaceDerivs.derivs[0][1].y;
+
+      const a = s_ux * s_ux + s_vx * s_vx;
+      const b = s_ux * s_uy + s_vx * s_vy;
+      // b = c => c is unnecessary calculation
+      const d = s_uy * s_uy + s_vy * s_vy;
+
+      // More efficient version of the calculation of the reciprocal of the determinant calculation, since b = c. Reciprocal is used since we're assuming permittivity outside of a lens = 1 and permittivity' = n'^2 => sqrt(permittivity) / det(A) = 1/det(A)
+      const determinantRecip = 1 / Math.pow( s_ux * s_vx - s_uy * s_vy, 2 );
+
+    // may be wrong--> still learning, is weird --> // These are the x and y components of the new refractive index (it's anisotropic, so is direction dependent => can be represented as x and y components)
+      const n_x = determinantRecip * (a * x_der_s_prev + b * y_der_s_prev);
+      const n_y = determinantRecip * (b * x_der_s_prev + d * y_der_s_prev);
+
+      const nLen = Math.sqrt(n_x * n_x + n_y * n_y);
+      const n = {
+        x: n_x / nLen,
+        y: n_y / nLen
+      };
+
+      return geometry.point(p1.x + n.x * this.stepSize, p1.y + n.y * this.stepSize);
+    } catch (e) {
+      console.error(e.toString());
+      
+      // return geometry.point((p2.x - p1.x) / len, (p2.y - p1.y) / len);
+    }
+
+
     
-    const b = partialU.x * partialU.y + partialV.x * partialV.y;
-    const transformationMatrix = [
-      [
-        Math.pow(partialU.x, 2) + Math.pow(partialV.x, 2),
-        b
-      ],
-      [
-        b,
-        Math.pow(partialU.y, 2) + Math.pow(partialV.y, 2)
-      ]
-    ];
-    const transformationMatrixInv = [
-      [
-        Math.pow(partialU.y, 2) + Math.pow(partialV.y, 2),
-        -b
-      ],
-      [
-        -b,
-        Math.pow(partialU.x, 2) + Math.pow(partialV.x, 2)
-      ]
-    ];
-    const determinant = transformationMatrix[0][0] * transformationMatrix[1][1] - Math.pow(b, 2);
+    // old, broken
+
+    // const incidentLen = geometry.distance(p1, p2);
+    // const incidentUnitVec = {
+    //   x: (p2.x - p1.x) / incidentLen,
+    //   y: (p2.y - p1.y) / incidentLen
+    // };
     
-    // Assuming n outside the lens (i.e. where there is no lens) is equal to 1, and that permittivity is equal to permeability => n = sqrt(permittivity^2) = permittivity = 1
-    const refractedVec = {
-      x: transformationMatrixInv[0][0] * incidentUnitVec.x - b * incidentUnitVec.y,
-      y: -b * incidentUnitVec.x + transformationMatrixInv[1][1] * incidentUnitVec.y
-    };
-    console.log("Length of refracted vec: " + Number(Math.pow(refractedVec.x, 2) + Math.pow(refractedVec.y, 2)).toString());
+    // const b = partialU.x * partialU.y + partialV.x * partialV.y;
+    // const transformationMatrix = [
+    //   [
+    //     Math.pow(partialU.x, 2) + Math.pow(partialV.x, 2),
+    //     b
+    //   ],
+    //   [
+    //     b,
+    //     Math.pow(partialU.y, 2) + Math.pow(partialV.y, 2)
+    //   ]
+    // ];
+    // const transformationMatrixInv = [
+    //   [
+    //     Math.pow(partialU.y, 2) + Math.pow(partialV.y, 2),
+    //     -b
+    //   ],
+    //   [
+    //     -b,
+    //     Math.pow(partialU.x, 2) + Math.pow(partialV.x, 2)
+    //   ]
+    // ];
+    // const determinant = transformationMatrix[0][0] * transformationMatrix[1][1] - Math.pow(b, 2);
     
-    return geometry.point(refractedVec.x + p1.x, refractedVec.y + p1.y);
+    // // Assuming n outside the lens (i.e. where there is no lens) is equal to 1, and that permittivity is equal to permeability => n = sqrt(permittivity^2) = permittivity = 1
+    // const refractedVec = {
+    //   x: transformationMatrixInv[0][0] * incidentUnitVec.x - b * incidentUnitVec.y,
+    //   y: -b * incidentUnitVec.x + transformationMatrixInv[1][1] * incidentUnitVec.y
+    // };
+    // console.log("Length of refracted vec: " + Number(Math.pow(refractedVec.x, 2) + Math.pow(refractedVec.y, 2)).toString());
+    
+    // return geometry.point(refractedVec.x + p1.x, refractedVec.y + p1.y);
+
+
   }
 
   /**
    * Update the local NURBS surface instance when toNurbsSurfaceParams is updated
-   * @param {Object} nurbsParams
+   * @param {Object} nurbsParams_ - NURBS parameters in JSON format to be used in creation of SurfaceObject
    */
-  updateNURBSObj(nurbsParams) { 
-    this.toNurbsSurfaceParams = nurbsParams;
-    // this.toNurbsSurfaceObj = new SurfaceObject({ nurbsParams: this.toNurbsSurfaceParams });   // Saved separately from the GUI one since the GUI one is overwritten a lot
-
+  updateNURBSObj() { 
+    // try {
+      // if (this.toNurbsSurfaceParams && this.toNurbsSurfaceParams.nurbsParams) {
+      //   // this.toNurbsSurfaceParams.nurbsParams = nurbsParams;
+      //   // this.toNurbsSurfaceObj = new SurfaceObject({ nurbsParams: this.toNurbsSurfaceParams.nurbsParams });   // Saved separately from the GUI one since the GUI one is overwritten a lot
+      //   this.toNurbsSurfaceObj = new SurfaceObject({ nurbsParams: JSON.parse(JSON.stringify(this.toNurbsSurfaceParams.nurbsParams)) });   // Saved separately from the GUI one since the GUI one is overwritten a lot
+      // } else {
+      //   this.toNurbsSurfaceObj = new SurfaceObject({});
+      // }
+    // } catch (e) {
+    //   console.error(e.toString());
+    // }
     // Used to get points on the NURBS surface, given (u,v) coords. Can be done more efficiently using a custom implementation, but this has been skipped temporarily for sake of time.
-    this.toNurbsSurfaceObj = new NURBSSurface( this.toNurbsSurfaceParams.nurbsParams.degree1, this.toNurbsSurfaceParams.nurbsParams.degree2, this.toNurbsSurfaceParams.nurbsParams.knots1, this.toNurbsSurfaceParams.nurbsParams.knots2, this.toNurbsSurfaceParams.nurbsParams.ctrlPts );
+    try {
+      this.toNurbsSurfaceObj = new NURBSSurface( this.toNurbsSurfaceParams.nurbsParams.degree1, this.toNurbsSurfaceParams.nurbsParams.degree2, this.toNurbsSurfaceParams.nurbsParams.knots1, this.toNurbsSurfaceParams.nurbsParams.knots2, this.toNurbsSurfaceParams.nurbsParams.ctrlPts );
+    } catch (e) {
+      console.error(e.toString());
+    }
   }
   
   // calcNURBSSurfaceDerivativesXYZ(point, d, tol, maxIt, nurbsPosition, nurbsParams, threeSurfaceObj) {
