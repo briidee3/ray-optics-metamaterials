@@ -22,7 +22,7 @@
 import { app } from '../services/app'
 // import { CustomJsonMode } from '../utils/customJsonMode'
 import BasicScene from '../components/nurbs-editor/src/utils/BasicScene'
-import SurfaceObject from '../components/nurbs-editor/src/utils/NURBSSurface'
+import { SurfaceObject } from '../components/nurbs-editor/src/utils/NURBSSurface'
 import * as THREE from 'three'
 import { jsonEditorService } from './jsonEditor'
 
