@@ -26,6 +26,7 @@ import { SurfaceObject, calcNearestSurfacePointFromPoint, calcNURBSSurfaceDeriva
 // import { SurfaceObject } from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
 // import SurfaceObject from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
 import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
+import { Vector3, Vector4 } from 'three';
 
 /**
  * @typedef {Object} BodyMergingObj
@@ -337,13 +338,16 @@ class BaseGrinGlass extends BaseGlass {
    * @param {Ray} ray
    */
   step(p1, p2, ray) {
-    if (this.toEnabled && this.toNurbsSurfaceParams) {  // A more efficient way of doing this, e.g. changing which function is used at the moment toEnabled is set to true (or false), should be added eventually. Forsaken temporarily for testing and time constraints
+    const point = [];
+
+    const x = p2.x;
+    const y = p2.y;
+
+    if (this.toEnabled) {// && this.toNurbsSurfaceParams) {  // A more efficient way of doing this, e.g. changing which function is used at the moment toEnabled is set to true (or false), should be added eventually. Forsaken temporarily for testing and time constraints
       // Transformation optics functionality enabled
-      return this.stepTO(p1, p2, ray);
+      point.push(this.stepTO(p1, p2, ray));
     } else {
       const len = geometry.distance(p1, p2);
-      const x = p2.x;
-      const y = p2.y;
       const x_der_s_prev = (p2.x - p1.x) / len;
       const y_der_s_prev = Math.sign(p2.y - p1.y) * Math.sqrt(1 - x_der_s_prev ** 2);
 
@@ -353,15 +357,17 @@ class BaseGrinGlass extends BaseGlass {
       const x_new = x + this.stepSize * x_der_s;
       const y_new = y + this.stepSize * y_der_s;
 
+      point.push(geometry.point(x_new, y_new));
+
       // Absorption
       const alpha = ray.bodyMergingObj.fn_alpha({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
       const absorption = Math.exp(-alpha * this.stepSize);
 
       ray.brightness_s *= absorption;
       ray.brightness_p *= absorption;
-
-      return geometry.point(x_new, y_new);
     }
+
+    return point[0];
   }
 
   /**
@@ -372,59 +378,232 @@ class BaseGrinGlass extends BaseGlass {
    * @param {Point} p2
    * @param {Ray} ray
    */
-  stepTO(p1, p2, ray) {
+  stepTO(p1_, p2_, ray) {
+
+    // Subtract NURBS surface position
+    // const p1 = geometry.point(p1_.x - this.toNurbsSurfaceParams.nurbsPos.x, p1_.y - this.toNurbsSurfaceParams.nurbsPos.y);
+    // const p2 = geometry.point(p2_.x - this.toNurbsSurfaceParams.nurbsPos.x, p2_.y - this.toNurbsSurfaceParams.nurbsPos.y);
+    // const p1 = p1_;
+    // const p2 = p2_;
+    const p1 = geometry.point(p1_.x, -p1_.y);
+    const p2 = geometry.point(p2_.x, -p2_.y);
+
     // Taken directly from step() above
     const len = geometry.distance(p1, p2);
-    const x = p2.x;
-    const y = p2.y;
+    const x = p2.x - this.origin.x;
+    const y = p2.y - this.origin.y;
     const x_der_s_prev = (p2.x - p1.x) / len;
     const y_der_s_prev = Math.sign(p2.y - p1.y) * Math.sqrt(1 - x_der_s_prev ** 2);
 
-    try {
-      // Update NURBS surface instance
-      if (!this.toNurbsSurfaceObj) {
-        this.updateNURBSObj();
-      }
-      const nd = 1; // Number of derivatives to calculate for each of the uv coords in the NURBS surface (i.e. d=1 => partial of u, partial of v, and partial of both)
-      const tol = 0.0001; // tolerance for finding (u,v) which correlates to (x,y)
-      const maxIterations = 60; // Maximum number of iterations for the process of finding u and v for the point (x,y)
-      
-      const surfaceDerivs = calcNURBSSurfaceDerivativesXYZ(p1, nd, tol, maxIterations, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
+    const testingCase = 2;
 
-      const u = surfaceDerivs.uvCoords[0];
-      const v = surfaceDerivs.uvCoords[1];
-
-      const s_ux = surfaceDerivs.derivs[1][0].x;
-      const s_uy = surfaceDerivs.derivs[1][0].y;
-      const s_vx = surfaceDerivs.derivs[0][1].x;
-      const s_vy = surfaceDerivs.derivs[0][1].y;
-
-      const a = s_ux * s_ux + s_vx * s_vx;
-      const b = s_ux * s_uy + s_vx * s_vy;
-      // b = c => c is unnecessary calculation
-      const d = s_uy * s_uy + s_vy * s_vy;
-
-      // More efficient version of the calculation of the reciprocal of the determinant calculation, since b = c. Reciprocal is used since we're assuming permittivity outside of a lens = 1 and permittivity' = n'^2 => sqrt(permittivity) / det(A) = 1/det(A)
-      const determinantRecip = 1 / Math.pow( s_ux * s_vx - s_uy * s_vy, 2 );
-
-    // may be wrong--> still learning, is weird --> // These are the x and y components of the new refractive index (it's anisotropic, so is direction dependent => can be represented as x and y components)
-      const n_x = determinantRecip * (a * x_der_s_prev + b * y_der_s_prev);
-      const n_y = determinantRecip * (b * x_der_s_prev + d * y_der_s_prev);
-
-      const nLen = Math.sqrt(n_x * n_x + n_y * n_y);
-      const n = {
-        x: n_x / nLen,
-        y: n_y / nLen
-      };
-
-      return geometry.point(p1.x + n.x * this.stepSize, p1.y + n.y * this.stepSize);
-    } catch (e) {
-      console.error(e.toString());
-      
-      // return geometry.point((p2.x - p1.x) / len, (p2.y - p1.y) / len);
+    // Update NURBS surface instance
+    if (!this.toNurbsSurfaceObj) {
+      this.updateNURBSObj();
     }
 
+    console.log("P1, P2, nurbsPos");
+    console.log(p1);
+    console.log(p2);
+    console.log(this.toNurbsSurfaceParams.nurbsPos);
 
+    const nd = 1; // Number of derivatives to calculate for each of the uv coords in the NURBS surface (i.e. d=1 => partial of u, partial of v, and partial of both)
+    const tol = 0.0001; // tolerance for finding (u,v) which correlates to (x,y)
+    const maxIterations = 60; // Maximum number of iterations for the process of finding u and v for the point (x,y)
+
+
+    // Testing different methods of calculation of next point
+    switch (testingCase) {
+      case 0: {
+        try {
+          
+          const surfaceDerivs = calcNURBSSurfaceDerivativesXYZ(p2, nd, tol, maxIterations, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
+
+          const u = surfaceDerivs.uvCoords[0];
+          const v = surfaceDerivs.uvCoords[1];
+
+          const s_ux = 1 / surfaceDerivs.derivs[1][0].x;
+          const s_uy = 1 / surfaceDerivs.derivs[1][0].y;
+          const s_vx = 1 / surfaceDerivs.derivs[0][1].x;
+          const s_vy = 1 / surfaceDerivs.derivs[0][1].y;
+
+          const a = s_ux * s_ux + s_vx * s_vx;
+          const b = s_ux * s_uy + s_vx * s_vy;
+          // b = c => c is unnecessary calculation
+          const d = s_uy * s_uy + s_vy * s_vy;
+
+          // More efficient version of the calculation of the reciprocal of the determinant calculation, since b = c. Reciprocal is used since we're assuming permittivity outside of a lens = 1 and permittivity' = n'^2 => sqrt(permittivity) / det(A) = 1/det(A)
+          const determinantRecip = 1 / Math.pow( s_ux * s_vx - s_uy * s_vy, 2 );
+
+        // may be wrong--> still learning, is weird --> // These are the x and y components of the new refractive index (it's anisotropic, so is direction dependent => can be represented as x and y components)
+          const n_x = determinantRecip * (a * x_der_s_prev + b * y_der_s_prev);
+          const n_y = determinantRecip * (b * x_der_s_prev + d * y_der_s_prev);
+
+          const nLen = Math.sqrt(n_x * n_x + n_y * n_y);
+          const n = {
+            x: n_x / nLen,
+            y: n_y / nLen
+          };
+
+          return geometry.point(x + n.x * this.stepSize, y + n.y * this.stepSize);
+        } catch (e) {
+          console.error(e.toString());
+          
+          // return geometry.point((p2.x - p1.x) / len, (p2.y - p1.y) / len);
+        }
+        break;
+      }
+      case 1: {
+        const surfacePoints = [
+          calcNearestSurfacePointFromPoint(tol / 2, tol, maxIterations, new Vector3(p1.x, p1.y, 0), 0.7, this.toNurbsSurfaceObj),
+          calcNearestSurfacePointFromPoint(tol / 2, tol, maxIterations, new Vector3(p2.x, p2.y, 0), 0.7, this.toNurbsSurfaceObj)
+        ]
+
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const du = surfacePoints[1][0] - surfacePoints[0][0];
+        const dv = surfacePoints[1][1] - surfacePoints[0][1];
+
+        const dudx = du / dx;
+        const dudy = du / dy;
+        const dvdx = dv / dx;
+        const dvdy = dv / dy;
+
+        const a = dudx * dudx + dudy * dudy;
+        const b = dudx * dvdx + dudy * dvdy;
+        const d = dvdx * dvdx + dvdy * dvdy;
+
+        const determinantRecip = 1 / Math.pow( dudx * dvdy - dudy * dvdx, 2 );const n_x = determinantRecip * (a * x_der_s_prev + b * y_der_s_prev);
+        
+        const n_y = determinantRecip * (b * x_der_s_prev + d * y_der_s_prev);
+
+        const nLen = Math.sqrt(n_x * n_x + n_y * n_y);
+        const n = {
+          x: n_x / nLen,
+          y: n_y / nLen
+        };
+
+        return geometry.point(x + n.x * this.stepSize, y + n.y * this.stepSize);
+
+
+
+        break;
+      }
+      case 2: {
+        this.updateNURBSObj();
+        const surfaceDerivsP1 = calcNURBSSurfaceDerivativesXYZ(new Vector3(p1.x, p1.y, 0), nd, tol, maxIterations, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
+        const surfaceDerivsP2 = calcNURBSSurfaceDerivativesXYZ(new Vector3(p2.x, p2.y, 0), nd, tol, maxIterations, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
+        
+        // const du = surfaceDerivsP2.uvCoords[0] - surfaceDerivsP1.uvCoords[0];
+        // const dv = surfaceDerivsP2.uvCoords[1] - surfaceDerivsP1.uvCoords[1];
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+
+        console.log("Us and Vs");
+        console.log(surfaceDerivsP1.uvCoords);
+        console.log(surfaceDerivsP2.uvCoords);
+        // console.log(surfaceDerivsP1.derivs[0][1]);
+        // console.log(surfaceDerivsP1.derivs[1][0]);
+        // console.log(surfaceDerivsP2.derivs[0][1]);
+        // console.log(surfaceDerivsP2.derivs[1][0]);
+
+        // Normalize surface derivatives for their use as basis vectors of surface space
+        const lenUSDP1 = Math.sqrt(Math.pow(surfaceDerivsP1.derivs[1][0].x, 2) + Math.pow(surfaceDerivsP1.derivs[1][0].y, 2));
+        const lenUSDP2 = Math.sqrt(Math.pow(surfaceDerivsP2.derivs[1][0].x, 2) + Math.pow(surfaceDerivsP2.derivs[1][0].y, 2));
+        const lenVSDP1 = Math.sqrt(Math.pow(surfaceDerivsP1.derivs[0][1].x, 2) + Math.pow(surfaceDerivsP1.derivs[0][1].y, 2));
+        const lenVSDP2 = Math.sqrt(Math.pow(surfaceDerivsP2.derivs[0][1].x, 2) + Math.pow(surfaceDerivsP2.derivs[0][1].y, 2));
+
+        // Basis vectors in surface space at p1 and p2
+        const uHats = [
+          geometry.point(surfaceDerivsP1.derivs[1][0].x / lenUSDP1, surfaceDerivsP1.derivs[1][0].y / lenUSDP1),
+          geometry.point(surfaceDerivsP2.derivs[1][0].x / lenUSDP2, surfaceDerivsP2.derivs[1][0].y / lenUSDP2)
+        ];
+        const vHats = [
+          geometry.point(surfaceDerivsP1.derivs[0][1].x / lenVSDP1, surfaceDerivsP1.derivs[0][1].y / lenVSDP1),
+          geometry.point(surfaceDerivsP2.derivs[0][1].x / lenVSDP2, surfaceDerivsP2.derivs[0][1].y / lenVSDP2)
+        ];
+
+        // const du = uHats[0].x * dx + uHats[0].y * dy;
+        // const dv = vHats[0].x * dx + vHats[0].y * dy;
+        // const uThing = geometry.point(surfaceDerivsP2.derivs[0][1].x - surfaceDerivsP1.derivs[0][1].x, surfaceDerivsP2.derivs[0][1].y - surfaceDerivsP1.derivs[0][1].y);
+        // const vThing = geometry.point(surfaceDerivsP2.derivs[1][0].x - surfaceDerivsP1.derivs[1][0].x, surfaceDerivsP2.derivs[1][0].y - surfaceDerivsP1.derivs[1][0].y);
+        const du_ = surfaceDerivsP2.uvCoords[0] - surfaceDerivsP1.uvCoords[0];
+        const dv_ = surfaceDerivsP2.uvCoords[1] - surfaceDerivsP1.uvCoords[1];
+
+        const fdmuvBasesLen = Math.sqrt(du_ ** 2 + dv_ ** 2);
+        const du = du_ / fdmuvBasesLen;
+        const dv = dv_ / fdmuvBasesLen;
+
+        console.log("AAAAA");
+        console.log(du);
+        console.log(dv);
+        console.log(uHats);
+        console.log(vHats);
+
+        // Get next ray segment going from p2 outwards which has same length in surface space as distance between p1 and p2 in surface space
+        // const p3 = geometry.point(p2.x + du * uHats[1].x + dv * vHats[1].x, -(p2.y + dv * vHats[1].y + du * uHats[1].y));
+        const p3 = new Vector3();
+        this.toNurbsSurfaceObj.getPoint(surfaceDerivsP2.uvCoords[0] + du_, surfaceDerivsP2.uvCoords[1] + dv_, p3);
+        
+        console.log("Diff w p2:");
+        const p2__ = new Vector3();
+        this.toNurbsSurfaceObj.getPoint(surfaceDerivsP2.uvCoords[0], surfaceDerivsP2.uvCoords[1], p2__);
+        const p2Correction = geometry.point(p2__.x - p2.x+ this.toNurbsSurfaceParams.nurbsPos.x, p2__.y - p2.y+ this.toNurbsSurfaceParams.nurbsPos.y);
+        console.log(p2Correction);
+
+        const out = geometry.point(p3.x + this.toNurbsSurfaceParams.nurbsPos.x - p2Correction.x, -p3.y - this.toNurbsSurfaceParams.nurbsPos.y + p2Correction.y);
+        console.log("Out");
+        console.log(out);
+        console.log("P3");
+        console.log(p3);
+        return out;
+
+
+        // if that doesn't work:
+
+
+
+        break;
+      }
+      case 3: {
+
+        const surfacePoints = [
+          calcNearestSurfacePointFromPoint(tol / 2, tol, 100, new Vector3(p1.x - this.toNurbsSurfaceParams.nurbsPos.x, p1.y - this.toNurbsSurfaceParams.nurbsPos.y, 0), 0.7, this.toNurbsSurfaceObj),
+          calcNearestSurfacePointFromPoint(tol / 2, tol, 100, new Vector3(p2.x - this.toNurbsSurfaceParams.nurbsPos.x, p2.y - this.toNurbsSurfaceParams.nurbsPos.y, 0), 0.7, this.toNurbsSurfaceObj)
+        ];
+
+        const uvLen = Math.sqrt(Math.pow(surfacePoints[1][0] - surfacePoints[0][0], 2) + Math.pow(surfacePoints[1][1] - surfacePoints[0][1], 2));
+
+        const uHat = (surfacePoints[1][0] - surfacePoints[0][0]) / uvLen;
+        // const dv = (surfacePoints[1][1] - surfacePoints[0][1]) / uvLen;
+        const vHat = Math.sign(surfacePoints[1][1] - surfacePoints[0][1]) * Math.sqrt(1 - uHat ** 2);
+
+        // const dx = p2.x - p1.x;
+        // const dy = p2.y - p1.y;
+
+        const p3u = surfacePoints[1][0] + uHat * this.stepSize;
+        const p3v = surfacePoints[1][1] + vHat * this.stepSize;
+        // const p3u = surfacePoints[1][0] + this.stepSize;
+        // const p3v = surfacePoints[1][1] + this.stepSize;
+
+        console.log("Case 3 u v");
+        console.log(p3u);
+        console.log(p3v);
+
+        const p3 = new Vector3();
+        this.toNurbsSurfaceObj.getPoint(p3u, p3v, p3);
+        console.log("P3");
+        console.log(p3);
+        console.log("NurbsPos");
+        console.log(this.toNurbsSurfaceParams.nurbsPos);
+
+        // return geometry.point(p3.x - this.toNurbsSurfaceParams.nurbsPos.x, -p3.y + this.toNurbsSurfaceParams.nurbsPos.y);
+        const out = geometry.point(p3.x + this.toNurbsSurfaceParams.nurbsPos.x, -p3.y - this.toNurbsSurfaceParams.nurbsPos.y);
+        console.log("Out");
+        console.log(out);
+        return out;
+      }
+    }
     
     // old, broken
 
