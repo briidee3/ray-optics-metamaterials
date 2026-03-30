@@ -490,9 +490,9 @@ class BaseGrinGlass extends BaseGlass {
         break;
       }
       case 2: {
-        this.updateNURBSObj();
-        const surfaceDerivsP1 = calcNURBSSurfaceDerivativesXYZ(new Vector3(p1.x, p1.y, 0), nd, tol, maxIterations, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
-        const surfaceDerivsP2 = calcNURBSSurfaceDerivativesXYZ(new Vector3(p2.x, p2.y, 0), nd, tol, maxIterations, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
+        // this.updateNURBSObj();
+        const surfaceDerivsP1 = calcNURBSSurfaceDerivativesXYZ(new Vector3(p1.x, p1.y, 0), nd, tol, 100, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
+        const surfaceDerivsP2 = calcNURBSSurfaceDerivativesXYZ(new Vector3(p2.x, p2.y, 0), nd, tol, 100, this.toNurbsSurfaceParams.nurbsPos, this.toNurbsSurfaceParams.nurbsParams, this.toNurbsSurfaceObj);
         
         // const du = surfaceDerivsP2.uvCoords[0] - surfaceDerivsP1.uvCoords[0];
         // const dv = surfaceDerivsP2.uvCoords[1] - surfaceDerivsP1.uvCoords[1];
@@ -513,7 +513,7 @@ class BaseGrinGlass extends BaseGlass {
         const lenVSDP1 = Math.sqrt(Math.pow(surfaceDerivsP1.derivs[0][1].x, 2) + Math.pow(surfaceDerivsP1.derivs[0][1].y, 2));
         const lenVSDP2 = Math.sqrt(Math.pow(surfaceDerivsP2.derivs[0][1].x, 2) + Math.pow(surfaceDerivsP2.derivs[0][1].y, 2));
 
-        // Basis vectors in surface space at p1 and p2
+        // // Basis vectors in surface space at p1 and p2
         const uHats = [
           geometry.point(surfaceDerivsP1.derivs[1][0].x / lenUSDP1, surfaceDerivsP1.derivs[1][0].y / lenUSDP1),
           geometry.point(surfaceDerivsP2.derivs[1][0].x / lenUSDP2, surfaceDerivsP2.derivs[1][0].y / lenUSDP2)
@@ -522,6 +522,7 @@ class BaseGrinGlass extends BaseGlass {
           geometry.point(surfaceDerivsP1.derivs[0][1].x / lenVSDP1, surfaceDerivsP1.derivs[0][1].y / lenVSDP1),
           geometry.point(surfaceDerivsP2.derivs[0][1].x / lenVSDP2, surfaceDerivsP2.derivs[0][1].y / lenVSDP2)
         ];
+         
 
         // const du = uHats[0].x * dx + uHats[0].y * dy;
         // const dv = vHats[0].x * dx + vHats[0].y * dy;
@@ -539,19 +540,49 @@ class BaseGrinGlass extends BaseGlass {
         console.log(dv);
         console.log(uHats);
         console.log(vHats);
+        
+        
+        console.log("Diff between r dot uhat and delta u:");
+        console.log( du_ - ( surfaceDerivsP2.derivs[1][0].x * dx + surfaceDerivsP2.derivs[1][0].y * dy ) );
+        // console.log(geometry.point(  ))
+
+
+        // checking if inverse of uhat/vhat components is what we want instead
+        // Note: Make sure to add check for divide by zero
+
+
+
+
+        // Trying to fix the issue with step length being less than difference between uv of p2 and that of p3
+        // prevStepLen = ??
+        // if fdmuvBasesLen < tol
+        //   du *= prevStepLen, likewise for dv
 
         // Get next ray segment going from p2 outwards which has same length in surface space as distance between p1 and p2 in surface space
         // const p3 = geometry.point(p2.x + du * uHats[1].x + dv * vHats[1].x, -(p2.y + dv * vHats[1].y + du * uHats[1].y));
+        // const p3 = geometry.point(p2.x - this.toNurbsSurfaceParams.nurbsPos.x + du_ * uHats[1].x + dv_ * vHats[1].x, -(p2.y  - this.toNurbsSurfaceParams.nurbsPos.y + dv_ * vHats[1].y + du_ * uHats[1].y));
+        // const p3 = geometry.point(p2.x + du_ * surfaceDerivsP2.derivs[1][0].x + dv_ * surfaceDerivsP2.derivs[0][1].x, - (p2.y + dv_ * surfaceDerivsP2.derivs[0][1].y + du_ * surfaceDerivsP2.derivs[1][0].y));
+        
+        // this one "works"
         const p3 = new Vector3();
         this.toNurbsSurfaceObj.getPoint(surfaceDerivsP2.uvCoords[0] + du_, surfaceDerivsP2.uvCoords[1] + dv_, p3);
         
+        // Get a rough correction for the difference in position between p2 and the point on the NURBS surface found closest to p2 during the process of approximation of nearest point on the surface
         console.log("Diff w p2:");
         const p2__ = new Vector3();
         this.toNurbsSurfaceObj.getPoint(surfaceDerivsP2.uvCoords[0], surfaceDerivsP2.uvCoords[1], p2__);
-        const p2Correction = geometry.point(p2__.x - p2.x+ this.toNurbsSurfaceParams.nurbsPos.x, p2__.y - p2.y+ this.toNurbsSurfaceParams.nurbsPos.y);
+        const p2Correction = geometry.point(p2__.x - p2.x + this.toNurbsSurfaceParams.nurbsPos.x, p2__.y - p2.y + this.toNurbsSurfaceParams.nurbsPos.y);
         console.log(p2Correction);
 
+        // Check if the length of most recent ray is less than the margin of error from the aforementioned point-on-surface approximation
+        if (((p3.x - p2.x + this.toNurbsSurfaceParams.nurbsPos.x) ** 2 + (-p3.y - this.toNurbsSurfaceParams.nurbsPos.y + p2.y) ** 2) < (p2Correction.x ** 2 + p2Correction.y ** 2)) {
+          console.warn("BaseGrinGlass.stepTO: Warning! Length of ray step less than margin of error!");
+        }
+        console.log((p3.x - p2.x + this.toNurbsSurfaceParams.nurbsPos.x) ** 2 + (-p3.y - this.toNurbsSurfaceParams.nurbsPos.y + p2.y) ** 2);
+
+        // const out = geometry.point(p3.x + this.toNurbsSurfaceParams.nurbsPos.x - p2Correction.x, -(p3.y + this.toNurbsSurfaceParams.nurbsPos.y - p2Correction.y));
         const out = geometry.point(p3.x + this.toNurbsSurfaceParams.nurbsPos.x - p2Correction.x, -p3.y - this.toNurbsSurfaceParams.nurbsPos.y + p2Correction.y);
+        // const out = geometry.point(p3.x - p2Correction.x, -(p3.y - p2Correction.y));
         console.log("Out");
         console.log(out);
         console.log("P3");
