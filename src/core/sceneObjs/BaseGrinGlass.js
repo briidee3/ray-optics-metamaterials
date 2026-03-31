@@ -345,7 +345,14 @@ class BaseGrinGlass extends BaseGlass {
 
     if (this.toEnabled) {// && this.toNurbsSurfaceParams) {  // A more efficient way of doing this, e.g. changing which function is used at the moment toEnabled is set to true (or false), should be added eventually. Forsaken temporarily for testing and time constraints
       // Transformation optics functionality enabled
-      point.push(this.stepTO(p1, p2, ray));
+      // point.push(this.stepTO(p1, p2, ray));
+      
+      // Instead of going back and forth, just assume that the ray is in NURBS-space (i.e. uv), traveling in a straight line. We'll get the actual ray from what that u,v coordinate pair maps to.
+      const len = geometry.distance(p1, p2);
+      const x_der_s_prev = (p2.x - p1.x) / len;
+      point.push(geometry.point(x + this.stepSize * x_der_s_prev, y + this.stepSize * Math.sign(p2.y - p1.y) * Math.sqrt(1 - x_der_s_prev ** 2)));
+
+      // Ignoring absorption for now
     } else {
       const len = geometry.distance(p1, p2);
       const x_der_s_prev = (p2.x - p1.x) / len;
@@ -385,6 +392,8 @@ class BaseGrinGlass extends BaseGlass {
     // const p2 = geometry.point(p2_.x - this.toNurbsSurfaceParams.nurbsPos.x, p2_.y - this.toNurbsSurfaceParams.nurbsPos.y);
     // const p1 = p1_;
     // const p2 = p2_;
+
+    // Flip y to align with NURBS coordinate space
     const p1 = geometry.point(p1_.x, -p1_.y);
     const p2 = geometry.point(p2_.x, -p2_.y);
 

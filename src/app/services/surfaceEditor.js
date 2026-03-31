@@ -403,6 +403,14 @@ class SurfaceEditorService {
           break;
         }
         case "GrinGlass":
+          const lines = [ null ]
+          const linesGeoms = []
+          const linesMeshes = []
+          for (let i = 0; i < pdrosJsonObject.path.length; i++) {
+            // Y-axis flipped relative to PDROS coords
+            linesGeoms.push(new THREE.BufferGeometry().setFromPoints( linesPoints ))
+          }
+
           break;
         case "ParamGrinGlass":
           break;
