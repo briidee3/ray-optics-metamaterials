@@ -21,6 +21,7 @@ import * as C2S from 'canvas2svg';
 import * as sceneObjs from './sceneObjs.js';
 import BaseGlass from './sceneObjs/BaseGlass.js';
 import i18next from 'i18next';
+import { Vector3 } from 'three';
 
 /**
  * @typedef {Object} Ray
@@ -486,6 +487,7 @@ class Simulator {
       this.leftRayCount = 0;
       this.last_s_obj_index = -1;
       this.last_ray = null;
+      // this.last_ray_uv = null;
       this.last_intersection = null;
       this.pendingRaysIndex = -1;
       this.firstBreak = true;
@@ -537,7 +539,12 @@ class Simulator {
     var s_obj;
     var s_obj_index;
     var s_point;
+    var s_point_uv = null;
     var s_point_temp;
+    var s_point_temp_uv = null;  // Temp store of transformed coords from uv
+    var s_point_dist_to_temp;
+    var pendingRaysj_uv = null;
+    var tmp_pt_1;
     var s_lensq;
     var s_lensq_temp;
     var s_undefinedBehavior = false;
@@ -579,6 +586,7 @@ class Simulator {
         this.leftRayCount = 0;
         this.last_s_obj_index = -1;
         this.last_ray = null;
+        // this.last_ray_uv = null;
         this.last_intersection = null;
         this.pendingRaysIndex = -1;
         continue;
@@ -600,12 +608,126 @@ class Simulator {
         s_lensq = Infinity;
         observed = false; // Whether this.pendingRays[j] is observed by the observer
         for (var i = 0; i < opticalObjs.length; i++) {
+            console.log({...this.pendingRays[j]});
+          s_point_temp = opticalObjs[i].checkRayIntersects(this.pendingRays[j]);  // Should handle both UV- and XY-space
+            console.log({...this.pendingRays[j]});
+
+          if (typeof opticalObjs[i].toEnabled !== undefined && opticalObjs[i].toEnabled) {
+            // Make something to store info about coordinate spaces (used for TO/alternative GRIN ray tracing)
+            var uvSpace = {
+              s_point_temp: false,
+              // pendingRaysj: false,
+              s_point: false
+            };
+            pendingRaysj_uv = null;
+            // pendingRaysj_uv = {...this.pendingRays[j]}; // reset for current iteration
+            // pendingRaysj_uv.p1 = {...this.pendingRays[j].p1};
+            // pendingRaysj_uv.p2 = {...this.pendingRays[j].p2};
+            // Handle point 1 uv
+            // if (typeof this.pendingRays[j].p1.isUv !== "undefined" && this.pendingRays[j].p1.isUv) {
+            if (this.pendingRays[j].p1.isUv || geometry.length(this.pendingRays[j].p1) < 2) { // Temporarily doing if vector length of thepoint is < 1, since for points in UV-space, that should always be true. this should be changed as soon as possible, since otherwise it could cause unintentional consequences.
+              // uvSpace.pendingRaysj = true;
+              // if (pendingRaysj_uv === null) pendingRaysj_uv = {...this.pendingRays[j]};
+              pendingRaysj_uv = {...this.pendingRays[j]};
+              pendingRaysj_uv.p2 = {...this.pendingRays[j].p2};
+              pendingRaysj_uv.p1 = {...this.pendingRays[j].p1};
+              tmp_pt_1 = new Vector3(0, 0, 0);
+              opticalObjs[i].toNurbsSurfaceObj.getPoint(this.pendingRays[j].p1.x, this.pendingRays[j].p1.y, tmp_pt_1);
+              this.pendingRays[j].p1 = geometry.point(tmp_pt_1.x + opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.x, -tmp_pt_1.y - opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.y);
+              console.log("p1")
+            }
+
+            // Handle point 2 uv
+            // if (typeof this.pendingRays[j].p2.isUv !== "undefined") {
+            if (this.pendingRays[j].p2.isUv || geometry.length(this.pendingRays[j].p2) < 2) {
+              // console.log(opticalObjs[i])
+              if (pendingRaysj_uv === null) {
+                pendingRaysj_uv = {...this.pendingRays[j]};
+                pendingRaysj_uv.p1 = {...this.pendingRays[j].p1};
+              }
+              // uvSpace.pendingRaysj = true;
+
+              pendingRaysj_uv.p2 = {...this.pendingRays[j].p2};
+              tmp_pt_1 = new Vector3(0, 0, 0);
+              opticalObjs[i].toNurbsSurfaceObj.getPoint(this.pendingRays[j].p2.x, this.pendingRays[j].p2.y, tmp_pt_1);
+              this.pendingRays[j].p2 = geometry.point(tmp_pt_1.x + opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.x, -tmp_pt_1.y - opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.y);
+              console.log("p2")
+            }
+            console.log({...this.pendingRays[j]});
+            console.log({...pendingRaysj_uv});
+          }
+
+          // console.log(pendingRaysj_uv);
+          // console.log(this.pendingRays[j]);
           // Test whether opticalObjs[i] intersects with the ray
-          s_point_temp = opticalObjs[i].checkRayIntersects(this.pendingRays[j]);
+          // s_point_temp = opticalObjs[i].checkRayIntersects(this.pendingRays[j]);
           if (s_point_temp) {
-            // Here opticalObjs[i] intersects with the ray at s_point_temp
-            s_lensq_temp = geometry.distanceSquared(this.pendingRays[j].p1, s_point_temp);
-            if (s_point && geometry.distanceSquared(s_point_temp, s_point) < Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale && (opticalObjs[i] instanceof BaseGlass || s_obj instanceof BaseGlass)) {
+            // Check if uv-space or not
+            if (typeof opticalObjs[i].toEnabled !== undefined && opticalObjs[i].toEnabled) {
+              if (s_point_temp.isUv || geometry.length(s_point_temp) < 2) {
+                uvSpace.s_point_temp = true;
+                s_point_temp_uv = {...s_point_temp};
+                tmp_pt_1 = new Vector3(0, 0, 0);
+                opticalObjs[i].toNurbsSurfaceObj.getPoint(s_point_temp_uv.x, s_point_temp_uv.y, tmp_pt_1);
+                s_point_temp = geometry.point(tmp_pt_1.x + opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.x, -tmp_pt_1.y - opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.y);
+                // s_point_temp_xy.y = -s_point_temp_xy.y;
+              }
+              else {
+                uvSpace.s_point_temp = false;
+                s_point_temp_uv = null;
+              }
+
+              tmp_pt_1 = new Vector3(0, 0, 0);
+
+              // s_lensq_temp, consideration of uv-space
+              // if (uvSpace.s_point_temp) {
+                // if (uvSpace.pendingRaysj) {
+                  // opticalObjs[i].toNurbsSurfaceObj.getPoint(this.pendingRays[j].p1.x, this.pendingRays[j].p1.y, tmp_pt_1);
+                  // s_lensq_temp = geometry.distanceSquared(geometry.point(tmp_pt_1.x, tmp_pt_1.y), geometry.point(s_point_temp_xy.x, s_point_temp_xy.y));  // y is flipped for both of these, so the flip should be no issue after the squaring
+                // }
+                // else {
+                // s_lensq_temp = geometry.distanceSquared(this.pendingRays[j].p1, s_point_temp);
+                // }
+              // }
+              // else {
+                // if (uvSpace.pendingRaysj) {
+                  // opticalObjs[i].toNurbsSurfaceObj.getPoint(this.pendingRays[j].p1.x, this.pendingRays[j].p1.y, tmp_pt_1);
+                  // s_lensq_temp = geometry.distanceSquared(geometry.point(tmp_pt_1.x, tmp_pt_1.y), s_point_temp);
+                // }
+                // else {
+              s_lensq_temp = geometry.distanceSquared(this.pendingRays[j].p1, s_point_temp);
+                // }
+              // }
+
+              // Distance squared between s_point_temp and s_point
+              // if (s_point) {
+              //   if (s_point_temp_uv) {
+              //     if (s_point_uv) {
+              //       // opticalObjs[i].toNurbsSurfaceObj.getPoint(s_point.x, s_point.y, tmp_pt_1);
+              //       s_point_dist_to_temp = geometry.distanceSquared(s_point_temp, geometry.point(tmp_pt_1.x, -tmp_pt_1.y));
+              //     }
+              //     else {
+              //       s_point_dist_to_temp = geometry.distanceSquared(s_point_temp_xy, s_point);
+              //     }
+              //   }
+              //   else {
+              //     if (uvSpace.s_point) {
+              //       opticalObjs[i].toNurbsSurfaceObj.getPoint(s_point.x, s_point.y, tmp_pt_1);
+              //       s_point_dist_to_temp = geometry.distanceSquared(s_point_temp, geometry.point(tmp_pt_1.x, -tmp_pt_1.y));
+              //     }
+              //     else {
+              //       s_point_dist_to_temp = geometry.distanceSquared(s_point_temp, s_point);
+              //     }
+              //   }
+              // }
+              if (s_point) s_point_dist_to_temp = geometry.distanceSquared(s_point_temp, s_point);
+            }
+            else {
+              // Here opticalObjs[i] intersects with the ray at s_point_temp
+              s_lensq_temp = geometry.distanceSquared(this.pendingRays[j].p1, s_point_temp);
+              if (s_point) s_point_dist_to_temp = geometry.distanceSquared(s_point_temp, s_point);
+            }
+            if (s_point && s_point_dist_to_temp < Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale && (opticalObjs[i] instanceof BaseGlass || s_obj instanceof BaseGlass)) {
               // The ray is incident on two objects at the same time, and at least one of them is a glass
 
               if (s_obj instanceof BaseGlass) {
@@ -626,8 +748,21 @@ class Simulator {
                   // Let the one which is not a glass to handle the ray
                   s_obj = opticalObjs[i];
                   s_obj_index = i;
-                  s_point = s_point_temp;
                   s_lensq = s_lensq_temp;
+                  s_point = s_point_temp;
+
+                  // Update tracking of spaces of points
+                  if (typeof opticalObjs[i].toEnabled !== "undefined" && opticalObjs[i].toEnabled) {
+                    uvSpace.s_point = uvSpace.s_point_temp;
+
+                    // if (uvSpace.s_point_temp) {
+                    s_point_uv = s_point_temp_uv;
+                    // }
+                  }
+                  else {
+                    uvSpace.s_point = false;
+                    s_point_uv = null;
+                  }
                 }
               } else {
                 // Only the second object is a glass
@@ -640,18 +775,31 @@ class Simulator {
                 surfaceMergingObjs[surfaceMergingObjs.length] = opticalObjs[i];
               }
             } else {
-              if (s_point && geometry.distanceSquared(s_point_temp, s_point) < Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
+              if (s_point && s_point_dist_to_temp < Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
                 // the ray is incident on two objects at the same time, and none of them is a glass
                 s_undefinedBehavior = true;
                 s_undefinedBehaviorObjs = [s_obj, opticalObjs[i]];
               } else if (s_lensq_temp < s_lensq && s_lensq_temp > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
                 s_obj = opticalObjs[i]; // Update the object to be incident on
                 s_obj_index = i;
-                s_point = s_point_temp;
                 s_lensq = s_lensq_temp;
                 s_undefinedBehavior = false;
                 s_undefinedBehaviorObjs = [];
                 surfaceMergingObjs = [];
+                s_point = s_point_temp;
+
+                // Update tracking of spaces of points
+                if (typeof opticalObjs[i].toEnabled !== undefined && opticalObjs[i].toEnabled) {
+                  uvSpace.s_point = uvSpace.s_point_temp;
+
+                  // if (uvSpace.s_point_temp) {
+                  s_point_uv = s_point_temp_uv;
+                  // }
+                }
+                else {
+                  uvSpace.s_point = false;
+                  s_point_uv = null;
+                }
               }
             }
           }
@@ -731,6 +879,8 @@ class Simulator {
             }
           }
         }
+
+        // Handle if last_ray includes any points in uv-space
         
         if (this.scene.mode == 'observer' && this.last_ray && this.canvasRendererMain) {
           if (!this.pendingRays[j].gap) {
@@ -852,7 +1002,18 @@ class Simulator {
         }
         this.pendingRays[j].isNew = false;
 
-        this.last_ray = { p1: this.pendingRays[j].p1, p2: this.pendingRays[j].p2 };
+        // Restore this.pendingRays[j] to UV-space if it was there
+        // if (opticalObjs[i].toEnabled){// && pendingRaysj_uv !== null) {
+        if (pendingRaysj_uv !== null) {
+          this.pendingRays[j] = pendingRaysj_uv;
+          s_point = s_point_uv;
+        }
+        console.log({...pendingRaysj_uv});
+        console.log({...this.pendingRays[j]});
+        console.log({...s_point});
+
+        this.last_ray = { p1: this.pendingRays[j].p1, p2: this.pendingRays[j].p2 }; // Doesn't need to be considered as to whether or not in uv-space; pendingRays[j] p1 and p2 should here be always in xy-space, and this.last_ray is only needed for visuals
+        // this.last_ray_uv = { p1: pendingRaysj_uv.p1, p2: pendingRaysj_uv.p2 };
         this.last_s_obj_index = s_obj_index;
         if (s_obj) {
           // Track and enforce maximum ray interaction depth.
@@ -875,7 +1036,7 @@ class Simulator {
             continue;
           }
 
-          const ret = s_obj.onRayIncident(this.pendingRays[j], j, s_point, surfaceMergingObjs);
+          const ret = s_obj.onRayIncident(this.pendingRays[j], j, s_point, surfaceMergingObjs); // Can turn this.pendingRays[j] into a ray in uv-space
           if (ret) {
             if (ret.isUndefinedBehavior) {
               this.declareUndefinedBehavior(this.pendingRays[j], [s_obj]);
