@@ -324,7 +324,7 @@ const geometry = {
    * @return {Point}
    */
   normalizeVec: function(p1) {
-    var len = geometry.distance(geometry.point(0, 0), p1);
+    var len = length(p1);
 
     return geometry.point(p1.x / len, p1.y / len);
   },
@@ -340,6 +340,15 @@ const geometry = {
       x: p1.x * Math.cos(angle) - p1.y * Math.sin(angle),
       y: p1.x * Math.sin(angle) + p1.y * Math.cos(angle)
     }
+  },
+
+  /**
+   * Get vector length of a point (i.e. treat the point as a vector and get its length)
+   * @param {Point} p1
+   * @return {Number}
+   */
+  length: function(p1) {
+    return geometry.distance(geometry.point(0, 0), p1);
   }
 };
 
