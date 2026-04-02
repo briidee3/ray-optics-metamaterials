@@ -18,6 +18,8 @@ import BaseGrinGlass from '../BaseGrinGlass.js';
 import i18next from 'i18next';
 import Simulator from '../../Simulator.js';
 import geometry from '../../geometry.js';
+import { defaultNurbsParams, pointInversionXYZ } from '../../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
+import { Vector3 } from 'three';
 
 /**
  * Gradient-index glass of the shape of a polygon
@@ -32,6 +34,12 @@ import geometry from '../../geometry.js';
  * @property {Point} origin - The origin of the (x,y) coordinates used in the refractive index function.
  * @property {number} stepSize - The step size for the ray trajectory equation.
  * @property {number} intersectTol - The epsilon for the intersection calculations.
+ * @property {boolean} toEnabled - Toggle for transformation optics functionality with the surface editor
+ * @property {object} toNurbsSurfaceParams - NURBS Surface parameters for defining coordinates for use with transformation optics
+ * @property {object} toNurbsSurfaceObj - SurfaceObject instance used for calculations with regards to the NURBS surface
+ * @property {number} uvStepSize - The step size in uv-space (for use w/ TO), where the coordinates can range from 0 to 1 for either axis
+ * @property {number} inversionTol - Error tolerance for point inversion
+ * @property {number} maxIterations - Max iterations for point inversion
  */
 class GrinGlass extends BaseGrinGlass {
   static type = 'GrinGlass';
@@ -45,7 +53,12 @@ class GrinGlass extends BaseGrinGlass {
     origin: { x: 0, y: 0 },
     stepSize: 1,
     intersectTol: 1e-3,
-    partialReflect: true
+    partialReflect: true,
+    toEnabled: false,
+    toNurbsSurfaceParams: { nurbsParams: defaultNurbsParams, nurbsPos: geometry.point(0, 0) },
+    uvStepSize: 5,
+    inversionTol: 1e-5,
+    maxIterations: 100
   };
   
   populateObjBar(objBar) {
@@ -247,7 +260,26 @@ class GrinGlass extends BaseGrinGlass {
   }
 
 
-  checkRayIntersects(ray) {
+  checkRayIntersects(ray_) {
+    var ray = {...ray_};
+
+    // Use point in uv-coords (NURBS surface space) to avoid need for point inversion for every step (thus making the ray essentially a linear line for all GRIN lenses)
+    if (this.toEnabled) {
+      // Convert uv-coords to xy-coords by plugging in to the NURBS surface function
+      const tmp = new Vector3(0, 0, 0);
+      // Temporarily doing if vector length of thepoint is < 1, since for points in UV-space, that should always be true. this should be changed as soon as possible, since otherwise it could cause unintentional consequences.
+      if (ray_.p1.isUv || geometry.length(ray_.p1) < 2) {
+        this.toNurbsSurfaceObj.getPoint(ray.p1.x, ray.p1.y, tmp);
+        ray.p1 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);  // Add nurbs position offset as well
+      }
+      // Flipping y back and forth to account for flipped y betwee xy and uv coords systems
+      if (ray_.p2.isUv || geometry.length(ray_.p2) < 2) {
+        this.toNurbsSurfaceObj.getPoint(ray.p2.x, ray.p2.y, tmp);
+        ray.p2 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);
+      }
+    }
+    // Now, ray is in xy-space, ray_ is in uv-space (if TO is enabled)
+
     if (this.notDone) { return; }
     if (!this.fn_p) {
       this.initFns();
@@ -257,9 +289,26 @@ class GrinGlass extends BaseGrinGlass {
       let len = geometry.distance(ray.p1, ray.p2);
       let x = ray.p1.x + (this.stepSize / len) * (ray.p2.x - ray.p1.x);
       let y = ray.p1.y + (this.stepSize / len) * (ray.p2.y - ray.p1.y);
-      const intersection_point = geometry.point(x, y);
-      if (this.isInsideGlass(intersection_point)) // if intersection_point is inside the glass
-        return intersection_point;
+
+      // Return x and y in uv space if TO enabled
+      if (this.isInsideGlass(geometry.point(x, y))) { // if intersection_point (in xy-space) is inside the glass
+        if (this.toEnabled && (ray_.p1.isUv || geometry.length(ray_.p1) < 2) && (ray_.p2.isUv || geometry.length(ray_.p2) < 2)) {
+          // if so, get x and y in uv-space, then return it
+          x = ray_.p1.x + (this.uvStepSize / len) * (ray_.p2.x - ray_.p1.x);
+          y = ray_.p1.y + (this.uvStepSize / len) * (ray_.p2.y - ray_.p1.y);
+          const intersection_point = geometry.point(x, y);
+          intersection_point.isUv = true;
+          console.log(intersection_point);
+          return intersection_point;
+        }
+        return geometry.point(x, y);
+      }
+      // Otherwise, go forth as normal
+      // else {
+        // const intersection_point = geometry.point(x, y);
+        // if (this.isInsideGlass(intersection_point)) // if intersection_point is inside the glass
+          // return intersection_point;
+      // }
     }
 
     var s_lensq = Infinity;
@@ -287,12 +336,51 @@ class GrinGlass extends BaseGrinGlass {
       }
     }
     if (s_point) {
+      if (this.toEnabled) {
+        // Invert the point if TO is enabled (i.e. get the nearest approximate point in uv-space to the point)
+        var s_point_new = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(s_point.x, -s_point.y), 0.707, this.toNurbsSurfaceObj);
+        s_point_new.isUv = true;
+        // console.log(s_point_new);
+        return s_point_new;
+      }
       return s_point;
     }
   }
 
-  onRayIncident(ray, rayIndex, incidentPoint, surfaceMergingObjs) {
-    if (!this.fn_p) {
+  onRayIncident(ray_, rayIndex, incidentPoint_, surfaceMergingObjs) {
+      console.log({...ray_})
+    var ray = {...ray_};
+    var incidentPoint = {...incidentPoint_};
+
+    // Use point in uv-coords (NURBS surface space) to avoid need for point inversion for every step (thus making the ray essentially a linear line for all GRIN lenses)
+    if (this.toEnabled) {
+      console.log({...ray_})
+      // Convert uv-coords to xy-coords by plugging in to the NURBS surface function
+      // Flipping y back and forth to account for flipped y betwee xy and uv coords systems
+      const tmp = new Vector3(0, 0, 0);
+      // Temporarily doing if vector length of thepoint is < 1, since for points in UV-space, that should always be true. this should be changed as soon as possible, since otherwise it could cause unintentional consequences.
+      if (ray_.p1.isUv || geometry.length(ray_.p1) < 2) {
+        this.toNurbsSurfaceObj.getPoint(ray.p1.x, ray.p1.y, tmp);
+        ray.p1 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);  // Add nurbs position offset as well
+      }
+      if (ray_.p2.isUv || geometry.length(ray_.p2) < 2) {
+        this.toNurbsSurfaceObj.getPoint(ray.p2.x, ray.p2.y, tmp);
+        ray.p2 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);
+      }
+      if (incidentPoint_.isUv || geometry.length(incidentPoint_) < 2) {
+        this.toNurbsSurfaceObj.getPoint(incidentPoint.x, incidentPoint.y, tmp);
+        incidentPoint = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);
+      } else {
+        // Make it uv if not already (should always be in uv-space if TO enabled)
+        incidentPoint = {...incidentPoint_};
+        incidentPoint_ = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(incidentPoint.x, -incidentPoint.y, 0), 0.707, this.toNurbsSurfaceObj);
+        console.log("incidentPoint and incidentPoint_");
+        console.log({...incidentPoint})
+        console.log({...incidentPoint_})
+      }
+    }
+
+    if (!this.fn_p && !this.toEnabled) {
       // This means that some error has been occuring eariler in parsing the equation.
       return {
         isAbsorbed: true
@@ -305,7 +393,7 @@ class GrinGlass extends BaseGrinGlass {
       {
         let r_bodyMerging_obj = ray.bodyMergingObj; // save the current bodyMergingObj of the ray, to pass it later to the reflected ray in the 'refract' function
 
-        var incidentData = this.getIncidentData(ray);
+        var incidentData = this.getIncidentData(ray_);
         var incidentType = incidentData.incidentType;
         if (incidentType == 1) {
           // From inside to outside
@@ -329,10 +417,12 @@ class GrinGlass extends BaseGrinGlass {
         return this.refract(ray, rayIndex, incidentData.s_point, incidentData.normal, n1, surfaceMergingObjs, r_bodyMerging_obj);
       } else {
         if (ray.bodyMergingObj === undefined)
-          ray.bodyMergingObj = this.initRefIndex(ray); // Initialize the bodyMerging object of the ray
-        const next_point = this.step(ray.p1, incidentPoint, ray);
-        ray.p1 = incidentPoint;
-        ray.p2 = next_point;
+          ray_.bodyMergingObj = this.initRefIndex(ray); // Initialize the bodyMerging object of the ray
+        console.log({...ray_})
+        const next_point = this.step(ray_.p1, incidentPoint_, ray_);
+        console.log(next_point)
+        ray_.p1 = incidentPoint_;
+        ray_.p2 = next_point;
       }
     } catch (e) {
       this.error = e.toString();

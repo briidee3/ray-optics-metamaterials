@@ -21,12 +21,9 @@ import i18next from 'i18next';
 import { evaluateLatex } from '../equation.js';
 import { parseTex } from 'tex-math-parser'
 import * as math from 'mathjs';
-import { SurfaceObject, calcNearestSurfacePointFromPoint, calcNURBSSurfaceDerivativesXYZ, isColliding } from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
-// import * as surfaceObj from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
-// import { SurfaceObject } from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
-// import SurfaceObject from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
-import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
-import { Vector3, Vector4 } from 'three';
+import { pointInversionXYZ, calcNURBSSurfaceDerivativesXYZ } from '../../app/components/nurbs-editor/src/utils/NURBSSurface.js';
+import { Vector3 } from 'three';
+import { surfaceEditorService } from '../../app/services/surfaceEditor.js';
 
 /**
  * @typedef {Object} BodyMergingObj
@@ -55,12 +52,29 @@ import { Vector3, Vector4 } from 'three';
  * @property {boolean} toEnabled - Toggle for transformation optics functionality with the surface editor
  * @property {object} toNurbsSurfaceParams - NURBS Surface parameters for defining coordinates for use with transformation optics
  * @property {object} toNurbsSurfaceObj - SurfaceObject instance used for calculations with regards to the NURBS surface
+ * @property {number} uvStepSize - The step size in uv-space (for use w/ TO), where the coordinates can range from 0 to 1 for either axis
+ * @property {number} inversionTol - Error tolerance for point inversion
+ * @property {number} maxIterations - Max iterations for point inversion
  */
 class BaseGrinGlass extends BaseGlass {
 
   constructor(scene, jsonObj) {
     super(scene, jsonObj);
     this.initFns();
+
+    // Transformation Optics initialization
+    try {
+      console.log(this.serialize());
+      this.toNurbsSurfaceObj = surfaceEditorService.seImportLens(this.serialize());
+      // if (this.toNurbsSurfaceParams) {
+      //   // this.updateNURBSObj(this.toNurbsSurfaceParams.nurbsParams);
+      //   this.updateNURBSObj();
+      // }
+      // this.toNurbsSurfaceParams = this.toNurbsSurfaceObj.nurbsParams;
+      console.log(this.toNurbsSurfaceObj)
+    } catch (e) {
+      console.error(e.toString());
+    }
   }
 
   populateObjBar(objBar) {
@@ -143,6 +157,12 @@ class BaseGrinGlass extends BaseGlass {
       ray.bodyMergingObj = this.initRefIndex(ray);
     }
     ray.bodyMergingObj = this.multRefIndex(ray.bodyMergingObj);
+    
+    // Make new point in lens in uv-space
+    // console.log(this.toNurbsSurfaceObj)
+    // const tmp = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(ray.p2.x, -ray.p2.y, 0), 0.707, this.toNurbsSurfaceObj)
+    // ray.p2 = geometry.point(tmp.x, tmp.y);
+    // ray.p2.isUv = true;
   }
 
   onRayExit(ray) {
@@ -150,6 +170,12 @@ class BaseGrinGlass extends BaseGlass {
       ray.bodyMergingObj = this.initRefIndex(ray);
     }
     ray.bodyMergingObj = this.devRefIndex(ray.bodyMergingObj);
+    
+    // Make next point outside uv-space
+    // const tmp = new Vector3(0, 0, 0);
+    // this.toNurbsSurfaceObj.getPoint(ray.p2.x, ray.p2.y, tmp);
+    // ray.p2 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos, -tmp.y - this.toNurbsSurfaceParams.nurbsPos);
+    // ray.p2.isUv = false;
   }
 
 
@@ -177,16 +203,6 @@ class BaseGrinGlass extends BaseGlass {
       delete this.fn_p_der_y;
       delete this.fn_alpha;
       this.error = e.toString();
-    }
-
-    // Transformation Optics initialization
-    try {
-      if (this.toNurbsSurfaceParams) {
-        // this.updateNURBSObj(this.toNurbsSurfaceParams.nurbsParams);
-        this.updateNURBSObj();
-      }
-    } catch (e) {
-      console.error(e.toString());
     }
   }
 
@@ -330,6 +346,206 @@ class BaseGrinGlass extends BaseGlass {
   }
 
   /**
+   * Do the refraction calculation at the surface of the glass. 
+   * @param {Ray} ray - The ray to be refracted.
+   * @param {number} rayIndex - The index of the ray in the ray array.
+   * @param {Point} incidentPoint - The incident point.
+   * @param {Point} normal - The normal vector at the incident point.
+   * @param {number} n1 - The effective refractive index of the current object (after determining the direction of incident of the current object, but before merging the surface with other objects).
+   * @param {Array<BaseGlass>} surfaceMergingObjs - The objects that are to be merged with the current object.
+   * @param {BaseGrinGlass} bodyMergingObj - The object that is to be merged with the current object.
+   * @returns {SimulationReturn} The return value for `onRayIncident`.
+   */
+  refract(ray_, rayIndex, incidentPoint_, normal, n1, surfaceMergingObjs, bodyMergingObj) {
+    var ray = {...ray_};
+    var incidentPoint = {...incidentPoint_};
+
+    // If using TO, use the parametric ray-tracing method
+    if (0){//(this.toEnabled) {
+      // Convert uv-coords to xy-coords by plugging in to the NURBS surface function
+      // Flipping y back and forth to account for flipped y betwee xy and uv coords systems
+      // const tmp = new Vector3(0, 0, 0);
+      // Temporarily doing if vector length of thepoint is < 1, since for points in UV-space, that should always be true. this should be changed as soon as possible, since otherwise it could cause unintentional consequences.
+      // if (ray_.p1.isUv || geometry.length(ray_.p1) < 2) {
+      //   this.toNurbsSurfaceObj.getPoint(ray.p1.x, -ray.p1.y, tmp);
+      //   ray.p1 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);  // Add nurbs position offset as well
+      // }
+      // if (ray_.p2.isUv || geometry.length(ray_.p2) < 2) {
+      //   this.toNurbsSurfaceObj.getPoint(ray.p2.x, -ray.p2.y, tmp);
+      //   ray.p2 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);
+      // }
+      // if (incidentPoint_.isUv || geometry.length(incidentPoint_) < 2) {
+      //   this.toNurbsSurfaceObj.getPoint(incidentPoint.x, -incidentPoint.y, tmp);
+      //   incidentPoint = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);
+      // } else {
+      //   // Make it uv if not already (should always be in uv-space if TO enabled)
+      //   incidentPoint = {...incidentPoint_};
+      //   incidentPoint_ = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(incidentPoint_.x, -incidentPoint_.y, 0), 0.707, this.toNurbsSurfaceObj);
+      // }
+
+      if (ray_.p1.isUv || geometry.length(ray_.p1) < 2) {
+        // p2 and p1 in UV
+        if (ray_.p2.isUv || geometry.length(ray_.p2) < 2) {
+          const tmp = { isUv: true, x: ray_.p2.x + (ray_.p2.x - ray_.p1.x), y: ray_.p2.y + (ray_.p2.y - ray_.p1.y) };
+          ray_.p1 = ray_.p2;
+          ray_.p2 = tmp;
+
+          return {
+            newRays: [],
+            truncation: 0
+          };
+        } 
+        // Inside to out (p1 in UV, p2 in XY). this should be handled elsewhere, never here (temporarily skipped for time)
+        else {
+          return {
+            isAbsorbed: true,
+            isUndefinedBehavior: true
+          };
+        }
+      }
+      // Outside to inside (XY to UV)
+      else if (ray_.p2.isUv || geometry.length(ray_.p2) < 2) {
+        // Assuming the one outside is still within the span of the NURBS surface (in XY-space) representing UV-space
+        const p1_uv = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(ray_.p1.x, -ray_.p1.y, 0), 0.707, this.toNurbsSurfaceObj);
+
+        // Update the ray
+        const tmp = { isUv: true, x: ray_.p2.x + (ray_.p2.x - p1_uv), y: ray_.p2.y + (ray_.p2.y - p1_uv) };
+        ray_.p1 = ray_.p2;
+        ray_.p2 = tmp;
+
+        return {
+          newRays: [],
+          truncation: 0
+        };
+      }
+    }
+    
+    // Surface merging
+    for (var i = 0; i < surfaceMergingObjs.length; i++) {
+      let incidentType = surfaceMergingObjs[i].getIncidentType(ray);
+      if (incidentType == 1) {
+        // From inside to outside
+        n1 *= surfaceMergingObjs[i].getRefIndexAt(incidentPoint, ray);
+        surfaceMergingObjs[i].onRayExit(ray);
+      } else if (incidentType == -1) {
+        // From outside to inside
+        n1 /= surfaceMergingObjs[i].getRefIndexAt(incidentPoint, ray);
+        surfaceMergingObjs[i].onRayEnter(ray);
+      } else if (incidentType == 0) {
+        // Equivalent to not intersecting with the obj (e.g. two interfaces overlap)
+        //n1=n1;
+      } else {
+        // Situation that may cause bugs (e.g. incident on an edge point)
+        // To prevent shooting the ray to a wrong direction, absorb the ray
+        return {
+          isAbsorbed: true,
+          isUndefinedBehavior: true
+        };
+      }
+    }
+
+    // Negative modifier for working with negative indices of refraction
+    var mod_neg = false;
+    if (n1 < 0) {
+      n1 = -n1;     // Flip n1 for compatibility with the following equations
+      mod_neg = true;
+    }
+
+    var normal_len = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
+    var normal_x = normal.x / normal_len;
+    var normal_y = normal.y / normal_len;
+
+    var ray_len = Math.sqrt((ray.p2.x - ray.p1.x) * (ray.p2.x - ray.p1.x) + (ray.p2.y - ray.p1.y) * (ray.p2.y - ray.p1.y));
+
+    var ray_x = (ray.p2.x - ray.p1.x) / ray_len;
+    var ray_y = (ray.p2.y - ray.p1.y) / ray_len;
+
+
+    // Reference http://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
+
+    var cos1 = -normal_x * ray_x - normal_y * ray_y;
+    var sq1 = 1 - n1 * n1 * (1 - cos1 * cos1);
+
+
+    if (sq1 < 0) {
+      // Total internal reflection
+      ray.p1 = incidentPoint;
+      ray.p2 = geometry.point(incidentPoint.x + ray_x + 2 * cos1 * normal_x, incidentPoint.y + ray_y + 2 * cos1 * normal_y);
+      if (bodyMergingObj) {
+        ray.bodyMergingObj = bodyMergingObj;
+      }
+    } else {
+      // Refraction
+      var cos2 = Math.sqrt(sq1);
+
+      if (this.partialReflect) {
+        var R_s = Math.pow((n1 * cos1 - cos2) / (n1 * cos1 + cos2), 2);
+        var R_p = Math.pow((n1 * cos2 - cos1) / (n1 * cos2 + cos1), 2);
+      // Reference http://en.wikipedia.org/wiki/Fresnel_equations#Definitions_and_power_equations
+      } else {
+        var R_s = 0;
+        var R_p = 0;
+      }
+
+      let newRays = [];
+      let truncation = 0;
+
+      // Handle the reflected ray
+      var ray2 = geometry.line(incidentPoint, geometry.point(incidentPoint.x + ray_x + 2 * cos1 * normal_x, incidentPoint.y + ray_y + 2 * cos1 * normal_y));
+      ray2.brightness_s = ray.brightness_s * R_s;
+      ray2.brightness_p = ray.brightness_p * R_p;
+      ray2.wavelength = ray.wavelength;
+      ray2.gap = ray.gap;
+      if (bodyMergingObj) {
+        ray2.bodyMergingObj = bodyMergingObj;
+      }
+      if (ray2.brightness_s + ray2.brightness_p > (this.scene.colorMode != 'default' ? 1e-6 : 0.01)) {
+        newRays.push(ray2);
+      } else {
+        truncation += ray2.brightness_s + ray2.brightness_p;
+        if (!ray.gap && !this.scene.colorMode != 'default') {
+          var amp = Math.floor(0.01 / (ray2.brightness_s + ray2.brightness_p)) + 1;
+          if (rayIndex % amp == 0) {
+            ray2.brightness_s = ray2.brightness_s * amp;
+            ray2.brightness_p = ray2.brightness_p * amp;
+            newRays.push(ray2);
+          }
+        }
+      }
+
+      // Handle the refracted ray
+
+      // Handle negative refractive index
+      if (mod_neg) {
+        // Restore n1
+        n1 = -n1;
+
+        // Flip sign of cos2
+        cos2 = Math.cos(2 * Math.PI - Math.acos(cos2));
+      }
+
+      ray.p1 = incidentPoint;
+      ray.p2 = geometry.point(incidentPoint.x + n1 * ray_x + (n1 * cos1 - cos2) * normal_x, incidentPoint.y + n1 * ray_y + (n1 * cos1 - cos2) * normal_y);
+      ray.brightness_s = ray.brightness_s * (1 - R_s);
+      ray.brightness_p = ray.brightness_p * (1 - R_p);
+
+      if (ray.brightness_s + ray.brightness_p > (this.scene.colorMode != 'default' ? 1e-6 : 0)) {
+        return {
+          newRays: newRays,
+          truncation: truncation
+        };
+      } else {
+        return {
+          isAbsorbed: true,
+          newRays: newRays,
+          truncation: truncation + ray.brightness_s + ray.brightness_p
+        };
+      }
+    }
+  }
+
+
+  /**
    * Receives two points inside this lens, and returns the next point to where the ray, connecting these two points, will travel, based on the ray trajectory equation (equation 11.1 in the cited text below)
    * Using Euler's method to solve the ray trajectory equation (based on sections 11.1 and 11.2, in the following text: https://doi.org/10.1007/BFb0012092)
   x_der_s and x_der_s_prev are the x-coordinate derivatives with respect to the arc-length parameterization, at two different points (similarly for y_der_s and y_der_s_prev)
@@ -342,15 +558,57 @@ class BaseGrinGlass extends BaseGlass {
 
     const x = p2.x;
     const y = p2.y;
+    console.log("step");
 
     if (this.toEnabled) {// && this.toNurbsSurfaceParams) {  // A more efficient way of doing this, e.g. changing which function is used at the moment toEnabled is set to true (or false), should be added eventually. Forsaken temporarily for testing and time constraints
       // Transformation optics functionality enabled
       // point.push(this.stepTO(p1, p2, ray));
-      
-      // Instead of going back and forth, just assume that the ray is in NURBS-space (i.e. uv), traveling in a straight line. We'll get the actual ray from what that u,v coordinate pair maps to.
-      const len = geometry.distance(p1, p2);
-      const x_der_s_prev = (p2.x - p1.x) / len;
-      point.push(geometry.point(x + this.stepSize * x_der_s_prev, y + this.stepSize * Math.sign(p2.y - p1.y) * Math.sqrt(1 - x_der_s_prev ** 2)));
+
+      // if (p1.isUv && p2.isUv) {
+        // Instead of going back and forth, just assume that the ray is in NURBS-space (i.e. uv), traveling in a straight line. We'll get the actual ray from what that u,v coordinate pair maps to.
+        // const len = geometry.distance(p1, p2);
+        // const x_der_s_prev = (p2.x - p1.x) / len;
+        // point.push(geometry.point(x + this.stepSize * x_der_s_prev, y + this.stepSize * Math.sign(p2.y - p1.y) * Math.sqrt(1 - x_der_s_prev ** 2)));
+        // point[0].isUv = true;
+      // }
+      // else if (!p1.isUv) {
+      var p1_uv, p2_uv;
+      // Temporarily doing if vector length of thepoint is < 1, since for points in UV-space, that should always be true. this should be changed as soon as possible, since otherwise it could cause unintentional consequences.
+      if (!p1.isUv || geometry.length(p1) > 2) {
+        console.log(geometry.length(p1))
+        console.log(p1)
+        p1_uv = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(p1.x, -p1.y, 0), 0.707, this.toNurbsSurfaceObj);
+        p1_uv.isUv = true;
+        console.log("p1")
+      } else {
+        p1_uv = {...p1};
+        p1_uv.isUv = true;
+      }
+
+      if (!p2.isUv || geometry.length(p2) > 2) {
+        p2_uv = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(p2.x, -p2.y, 0), 0.707, this.toNurbsSurfaceObj);
+        console.log("p2")
+        p2_uv.isUv = true;
+      } else {
+        p2_uv = {...p2};
+        p2_uv.isUv = true;
+      }
+      // const len = geometry.distance(p1_uv, p2_uv);
+      // const x_der_s_prev = (p2_uv.x - p1_uv.x) / len;
+      // const y_der_s_prev = (p2_uv.y - p1_uv.y) / len;
+      // point.push({
+      //   x: p2_uv.x + this.stepSize * x_der_s_prev, 
+      //   y: p2_uv.y + this.stepSize * y_der_s_prev, 
+      //   // y: p2_uv.y + this.stepSize * Math.sign(p2_uv.y - p1_uv.y) * Math.sqrt(1 - x_der_s_prev ** 2),
+      //   isUv: true
+      // });
+      point.push({
+        x: p2_uv.x + this.uvStepSize * (p2_uv.x - p1_uv.x),
+        y: p2_uv.y + this.uvStepSize * (p2_uv.y - p1_uv.y), 
+        // y: p2_uv.y + this.stepSize * Math.sign(p2_uv.y - p1_uv.y) * Math.sqrt(1 - x_der_s_prev ** 2),
+        isUv: true
+      });
+      console.log(point[0]);
 
       // Ignoring absorption for now
     } else {
@@ -431,10 +689,14 @@ class BaseGrinGlass extends BaseGlass {
           const u = surfaceDerivs.uvCoords[0];
           const v = surfaceDerivs.uvCoords[1];
 
-          const s_ux = 1 / surfaceDerivs.derivs[1][0].x;
-          const s_uy = 1 / surfaceDerivs.derivs[1][0].y;
-          const s_vx = 1 / surfaceDerivs.derivs[0][1].x;
-          const s_vy = 1 / surfaceDerivs.derivs[0][1].y;
+          // const s_ux = 1 / surfaceDerivs.derivs[1][0].x;
+          // const s_uy = 1 / surfaceDerivs.derivs[1][0].y;
+          // const s_vx = 1 / surfaceDerivs.derivs[0][1].x;
+          // const s_vy = 1 / surfaceDerivs.derivs[0][1].y;
+          const s_ux = surfaceDerivs.derivs[1][0].x;
+          const s_uy = surfaceDerivs.derivs[1][0].y;
+          const s_vx = surfaceDerivs.derivs[0][1].x;
+          const s_vy = surfaceDerivs.derivs[0][1].y;
 
           const a = s_ux * s_ux + s_vx * s_vx;
           const b = s_ux * s_uy + s_vx * s_vy;
@@ -464,8 +726,8 @@ class BaseGrinGlass extends BaseGlass {
       }
       case 1: {
         const surfacePoints = [
-          calcNearestSurfacePointFromPoint(tol / 2, tol, maxIterations, new Vector3(p1.x, p1.y, 0), 0.7, this.toNurbsSurfaceObj),
-          calcNearestSurfacePointFromPoint(tol / 2, tol, maxIterations, new Vector3(p2.x, p2.y, 0), 0.7, this.toNurbsSurfaceObj)
+          pointInversionXYZ(tol / 2, tol, maxIterations, new Vector3(p1.x, p1.y, 0), 0.7, this.toNurbsSurfaceObj),
+          pointInversionXYZ(tol / 2, tol, maxIterations, new Vector3(p2.x, p2.y, 0), 0.7, this.toNurbsSurfaceObj)
         ]
 
         const dx = p2.x - p1.x;
@@ -550,6 +812,31 @@ class BaseGrinGlass extends BaseGlass {
         console.log(uHats);
         console.log(vHats);
         
+
+        // Testing some refractive index shenanigans
+        const s_ux = surfaceDerivsP2.derivs[1][0].x;
+        const s_uy = surfaceDerivsP2.derivs[1][0].y;
+        const s_vx = surfaceDerivsP2.derivs[0][1].x;
+        const s_vy = surfaceDerivsP2.derivs[0][1].y;
+
+        const a = s_ux * s_ux + s_vx * s_vx;
+        const b = s_ux * s_uy + s_vx * s_vy;
+        // b = c => c is unnecessary calculation
+        const d = s_uy * s_uy + s_vy * s_vy;
+
+        // If using quasi-orthogonal discrete coordinate transformation (DCT) where the requirements are satisfied, this is approximately n (doi:10.1007/978-1-4471-4996-5_7).
+        // This assumes that the angles between uHat and vHat are approximately 90 degrees everywhere. 
+        const n_dct = 1 / (s_ux * s_vx - s_vy * s_uy);
+
+        // Another version, apparently is an effective average refractive index for anisotropic media
+        const c = 3 * 10 ** 8;  // Speed of light
+        const n_pendry = Math.sqrt(a * d) / c;
+
+        console.log("refractive indices comparison");
+        console.log(n_dct);
+        console.log(n_pendry);
+
+
         
         console.log("Diff between r dot uhat and delta u:");
         console.log( du_ - ( surfaceDerivsP2.derivs[1][0].x * dx + surfaceDerivsP2.derivs[1][0].y * dy ) );
@@ -608,8 +895,8 @@ class BaseGrinGlass extends BaseGlass {
       case 3: {
 
         const surfacePoints = [
-          calcNearestSurfacePointFromPoint(tol / 2, tol, 100, new Vector3(p1.x - this.toNurbsSurfaceParams.nurbsPos.x, p1.y - this.toNurbsSurfaceParams.nurbsPos.y, 0), 0.7, this.toNurbsSurfaceObj),
-          calcNearestSurfacePointFromPoint(tol / 2, tol, 100, new Vector3(p2.x - this.toNurbsSurfaceParams.nurbsPos.x, p2.y - this.toNurbsSurfaceParams.nurbsPos.y, 0), 0.7, this.toNurbsSurfaceObj)
+          pointInversionXYZ(tol / 2, tol, 100, new Vector3(p1.x - this.toNurbsSurfaceParams.nurbsPos.x, p1.y - this.toNurbsSurfaceParams.nurbsPos.y, 0), 0.7, this.toNurbsSurfaceObj),
+          pointInversionXYZ(tol / 2, tol, 100, new Vector3(p2.x - this.toNurbsSurfaceParams.nurbsPos.x, p2.y - this.toNurbsSurfaceParams.nurbsPos.y, 0), 0.7, this.toNurbsSurfaceObj)
         ];
 
         const uvLen = Math.sqrt(Math.pow(surfacePoints[1][0] - surfacePoints[0][0], 2) + Math.pow(surfacePoints[1][1] - surfacePoints[0][1], 2));
@@ -705,11 +992,13 @@ class BaseGrinGlass extends BaseGlass {
     //   console.error(e.toString());
     // }
     // Used to get points on the NURBS surface, given (u,v) coords. Can be done more efficiently using a custom implementation, but this has been skipped temporarily for sake of time.
-    try {
-      this.toNurbsSurfaceObj = new NURBSSurface( this.toNurbsSurfaceParams.nurbsParams.degree1, this.toNurbsSurfaceParams.nurbsParams.degree2, this.toNurbsSurfaceParams.nurbsParams.knots1, this.toNurbsSurfaceParams.nurbsParams.knots2, this.toNurbsSurfaceParams.nurbsParams.ctrlPts );
-    } catch (e) {
-      console.error(e.toString());
-    }
+    // try {
+    //   this.toNurbsSurfaceObj = new SurfaceObject({ threeScene: this.basicScene, texturePath: '../img/uv_grid_opengl.jpg', geomResolution: 50})
+      
+    //   this.toNurbsSurfaceObj = new NURBSSurface( this.toNurbsSurfaceParams.nurbsParams.degree1, this.toNurbsSurfaceParams.nurbsParams.degree2, this.toNurbsSurfaceParams.nurbsParams.knots1, this.toNurbsSurfaceParams.nurbsParams.knots2, this.toNurbsSurfaceParams.nurbsParams.ctrlPts );
+    // } catch (e) {
+    //   console.error(e.toString());
+    // }
   }
   
   // calcNURBSSurfaceDerivativesXYZ(point, d, tol, maxIt, nurbsPosition, nurbsParams, threeSurfaceObj) {
@@ -725,7 +1014,7 @@ class BaseGrinGlass extends BaseGlass {
   //     const tol_ = tol || 0.000001;
   //     const minDistForUnitVectors = tol_ / 2;
   //     const maxIterations = maxIt || 60;
-  //     const uvCoords = calcNearestSurfacePointFromPoint(minDistForUnitVectors, tol_, maxIterations, p, 0.5, threeSurfaceObj );
+  //     const uvCoords = pointInversionXYZ(minDistForUnitVectors, tol_, maxIterations, p, 0.5, threeSurfaceObj );
   
   //     return calcNURBSSurfaceDerivatives(uvCoords[0], uvCoords[1], d, nurbsParams);
   // }
