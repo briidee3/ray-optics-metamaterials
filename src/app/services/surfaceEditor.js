@@ -404,9 +404,8 @@ class SurfaceEditorService {
 
       console.log(defaultNurbsParams)
       // if (typeof curNurbs !== undefined) this.basicScene.addObject()
-      // if (pdrosJsonObject.toNurbsSurfaceParams) 
-      this.setNurbsParams(pdrosJsonObject.toNurbsSurfaceParams.nurbsParams || defaultNurbsParams, pdrosJsonObject.toNurbsSurfaceParams.nurbsPos || new THREE.Vector3(), this.index)   // keeping index always 0 for testing for now
-      // else this.setNurbsParams(defaultNurbsParams, this.index)
+      if (pdrosJsonObject.toNurbsSurfaceParams) this.setNurbsParams(pdrosJsonObject.toNurbsSurfaceParams.nurbsParams || defaultNurbsParams, pdrosJsonObject.toNurbsSurfaceParams.nurbsPos || new THREE.Vector3(), this.index)   // keeping index always 0 for testing for now
+      else this.setNurbsParams(defaultNurbsParams, new THREE.Vector3(), this.index)
 
       switch (pdrosJsonObject.type) {
         case "CircleGrinGlass": {
