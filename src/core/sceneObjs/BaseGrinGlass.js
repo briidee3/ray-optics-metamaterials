@@ -556,8 +556,8 @@ class BaseGrinGlass extends BaseGlass {
   step(p1, p2, ray) {
     const point = [];
 
-    const x = p2.x;
-    const y = p2.y;
+    var x = p2.x;
+    var y = p2.y;
     console.log("step");
 
     if (this.toEnabled) {// && this.toNurbsSurfaceParams) {  // A more efficient way of doing this, e.g. changing which function is used at the moment toEnabled is set to true (or false), should be added eventually. Forsaken temporarily for testing and time constraints
@@ -573,6 +573,7 @@ class BaseGrinGlass extends BaseGlass {
       // }
       // else if (!p1.isUv) {
       var p1_uv, p2_uv;
+      const tmp_pt = new Vector3();
       // Temporarily doing if vector length of thepoint is < 1, since for points in UV-space, that should always be true. this should be changed as soon as possible, since otherwise it could cause unintentional consequences.
       if (!p1.isUv || geometry.length(p1) > 2) {
         console.log(geometry.length(p1))
@@ -592,6 +593,9 @@ class BaseGrinGlass extends BaseGlass {
       } else {
         p2_uv = {...p2};
         p2_uv.isUv = true;
+        this.toNurbsSurfaceObj.getPoint(p2.x, p2.y, tmp_pt);
+        x = tmp_pt.x + this.toNurbsSurfaceParams.nurbsPos;
+        y = -tmp_pt.y - this.toNurbsSurfaceParams.nurbsPos;
       }
       // const len = geometry.distance(p1_uv, p2_uv);
       // const x_der_s_prev = (p2_uv.x - p1_uv.x) / len;
@@ -625,13 +629,27 @@ class BaseGrinGlass extends BaseGlass {
       point.push(geometry.point(x_new, y_new));
 
       // Absorption
-      const alpha = ray.bodyMergingObj.fn_alpha({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
+      // const alpha = ray.bodyMergingObj.fn_alpha({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
+      // const absorption = Math.exp(-alpha * this.stepSize);
+
+      // ray.brightness_s *= absorption;
+      // ray.brightness_p *= absorption;
+
+    // Absorption
+    const alpha = ray.bodyMergingObj.fn_alpha({ x: x, y: y, z: ray.wavelength || Simulator.GREEN_WAVELENGTH });
+    if (this.toEnabled) {
+      const absorption = Math.exp(-alpha * this.uvStepSize);  // Note: this should be changed eventually to actually be accurate. this is a temp fix which has not been thoroughly done for sake of time constraints
+
+      ray.brightness_s *= absorption;
+      ray.brightness_p *= absorption;
+    } else {
       const absorption = Math.exp(-alpha * this.stepSize);
 
       ray.brightness_s *= absorption;
       ray.brightness_p *= absorption;
     }
 
+    }
     return point[0];
   }
 

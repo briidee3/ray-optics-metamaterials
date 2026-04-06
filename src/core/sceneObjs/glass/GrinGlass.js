@@ -56,7 +56,7 @@ class GrinGlass extends BaseGrinGlass {
     partialReflect: true,
     toEnabled: false,
     toNurbsSurfaceParams: { nurbsParams: defaultNurbsParams, nurbsPos: geometry.point(0, 0) },
-    uvStepSize: 5,
+    uvStepSize: 1,
     inversionTol: 1e-5,
     maxIterations: 100
   };
