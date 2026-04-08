@@ -56,9 +56,10 @@ class GrinGlass extends BaseGrinGlass {
     partialReflect: true,
     toEnabled: false,
     toNurbsSurfaceParams: { nurbsParams: defaultNurbsParams, nurbsPos: geometry.point(0, 0) },
-    uvStepSize: 1,
-    inversionTol: 1e-5,
-    maxIterations: 100
+    uvStepSize: 0.05,
+    inversionTol: 5e-4,
+    maxIterations: 30,  // should go down to about 5e-4
+    noInternalReflection: false
   };
   
   populateObjBar(objBar) {
@@ -266,18 +267,20 @@ class GrinGlass extends BaseGrinGlass {
     // Use point in uv-coords (NURBS surface space) to avoid need for point inversion for every step (thus making the ray essentially a linear line for all GRIN lenses)
     if (this.toEnabled) {
       // Convert uv-coords to xy-coords by plugging in to the NURBS surface function
-      const tmp = new Vector3(0, 0, 0);
+      var tmp = new Vector3(0, 0, 0);
       // Temporarily doing if vector length of thepoint is < 1, since for points in UV-space, that should always be true. this should be changed as soon as possible, since otherwise it could cause unintentional consequences.
       if (ray_.p1.isUv || geometry.length(ray_.p1) < 2) {
         this.toNurbsSurfaceObj.getPoint(ray.p1.x, ray.p1.y, tmp);
         ray.p1 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);  // Add nurbs position offset as well
       }
+      tmp = new Vector3(0, 0, 0); // reset tmp
       // Flipping y back and forth to account for flipped y betwee xy and uv coords systems
       if (ray_.p2.isUv || geometry.length(ray_.p2) < 2) {
         this.toNurbsSurfaceObj.getPoint(ray.p2.x, ray.p2.y, tmp);
         ray.p2 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);
       }
     }
+    console.log(ray);
     // Now, ray is in xy-space, ray_ is in uv-space (if TO is enabled)
 
     if (this.notDone) { return; }
@@ -301,6 +304,8 @@ class GrinGlass extends BaseGrinGlass {
           console.log(intersection_point);
           return intersection_point;
         }
+        // Otherwise, if one or more ray_ points are in XY-coords, return using (XY versions of) the points
+        console.log(geometry.point(x,y));
         return geometry.point(x, y);
       }
       // Otherwise, go forth as normal
@@ -337,10 +342,16 @@ class GrinGlass extends BaseGrinGlass {
     }
     if (s_point) {
       if (this.toEnabled) {
+        console.log({...s_point})
         // Invert the point if TO is enabled (i.e. get the nearest approximate point in uv-space to the point)
-        var s_point_new = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(s_point.x, -s_point.y), 0.707, this.toNurbsSurfaceObj);
-        s_point_new.isUv = true;
-        // console.log(s_point_new);
+        const s_point_temp_2 = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(s_point.x, -s_point.y, 0), 0.707, this.toNurbsSurfaceObj, 2, false);
+        console.log({...s_point_temp_2})
+        const s_point_new = {
+          x: s_point_temp_2.x,
+          y: s_point_temp_2.y,
+          isUv: true
+        };
+        console.log({...s_point_new});
         return s_point_new;
       }
       return s_point;
@@ -348,9 +359,11 @@ class GrinGlass extends BaseGrinGlass {
   }
 
   onRayIncident(ray_, rayIndex, incidentPoint_, surfaceMergingObjs) {
-      console.log({...ray_})
+    console.log({...ray_})
+    console.log({...incidentPoint_})
     var ray = {...ray_};
     var incidentPoint = {...incidentPoint_};
+    const incidentPoint_orig = incidentPoint_;
 
     // Use point in uv-coords (NURBS surface space) to avoid need for point inversion for every step (thus making the ray essentially a linear line for all GRIN lenses)
     if (this.toEnabled) {
@@ -368,12 +381,18 @@ class GrinGlass extends BaseGrinGlass {
         ray.p2 = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);
       }
       if (incidentPoint_.isUv || geometry.length(incidentPoint_) < 2) {
-        this.toNurbsSurfaceObj.getPoint(incidentPoint.x, incidentPoint.y, tmp);
+        this.toNurbsSurfaceObj.getPoint(incidentPoint_.x, incidentPoint_.y, tmp);
         incidentPoint = geometry.point(tmp.x + this.toNurbsSurfaceParams.nurbsPos.x, -tmp.y - this.toNurbsSurfaceParams.nurbsPos.y);
       } else {
         // Make it uv if not already (should always be in uv-space if TO enabled)
         incidentPoint = {...incidentPoint_};
-        incidentPoint_ = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(incidentPoint.x, -incidentPoint.y, 0), 0.707, this.toNurbsSurfaceObj);
+        const tmp_2 = pointInversionXYZ(this.inversionTol / 10, this.inversionTol, this.maxIterations, new Vector3(incidentPoint.x, -incidentPoint.y, 0), 0.707, this.toNurbsSurfaceObj);
+        console.log(tmp_2)
+        incidentPoint_ = {
+          x: tmp_2.x,
+          y: tmp_2.y,
+          isUv: true
+        }
         console.log("incidentPoint and incidentPoint_");
         console.log({...incidentPoint})
         console.log({...incidentPoint_})
@@ -393,7 +412,7 @@ class GrinGlass extends BaseGrinGlass {
       {
         let r_bodyMerging_obj = ray.bodyMergingObj; // save the current bodyMergingObj of the ray, to pass it later to the reflected ray in the 'refract' function
 
-        var incidentData = this.getIncidentData(ray_);
+        var incidentData = this.getIncidentData(ray);
         var incidentType = incidentData.incidentType;
         if (incidentType == 1) {
           // From inside to outside
@@ -464,6 +483,7 @@ class GrinGlass extends BaseGrinGlass {
   /* Utility methods */
 
   getIncidentData(ray) {
+    console.log(ray);
     var s_lensq = Infinity;
     var s_lensq_temp;
     var s_point = null;

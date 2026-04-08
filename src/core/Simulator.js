@@ -610,6 +610,7 @@ class Simulator {
         for (var i = 0; i < opticalObjs.length; i++) {
           console.log({...this.pendingRays[j]});
           s_point_temp = opticalObjs[i].checkRayIntersects(this.pendingRays[j]);  // Should handle both UV- and XY-space
+          console.log({...s_point_temp})
           console.log({...this.pendingRays[j]});
 
           if (typeof opticalObjs[i].toEnabled !== undefined && opticalObjs[i].toEnabled) {
@@ -620,6 +621,8 @@ class Simulator {
               s_point: false
             };
             pendingRaysj_uv = null;
+            s_point_temp_uv = null;
+            s_point_uv = null;
             // pendingRaysj_uv = {...this.pendingRays[j]}; // reset for current iteration
             // pendingRaysj_uv.p1 = {...this.pendingRays[j].p1};
             // pendingRaysj_uv.p2 = {...this.pendingRays[j].p2};
@@ -653,13 +656,15 @@ class Simulator {
               this.pendingRays[j].p2 = geometry.point(tmp_pt_1.x + opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.x, -tmp_pt_1.y - opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.y);
               console.log("p2")
             }
-            console.log({...this.pendingRays[j]});
-            console.log({...pendingRaysj_uv});
             if (s_point && geometry.length(s_point) < 2) {
               s_point_uv = s_point;
               opticalObjs[i].toNurbsSurfaceObj.getPoint(this.pendingRays[j].p1.x, this.pendingRays[j].p1.y, tmp_pt_1);
               s_point = geometry.point(tmp_pt_1.x + opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.x, -tmp_pt_1.y - opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.y);
             }
+            console.log({...this.pendingRays[j]});
+            console.log({...pendingRaysj_uv});
+            console.log({...s_point})
+            console.log({...s_point_uv})
           }
 
           // console.log(pendingRaysj_uv);
@@ -676,6 +681,8 @@ class Simulator {
                 opticalObjs[i].toNurbsSurfaceObj.getPoint(s_point_temp_uv.x, s_point_temp_uv.y, tmp_pt_1);
                 s_point_temp = geometry.point(tmp_pt_1.x + opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.x, -tmp_pt_1.y - opticalObjs[i].toNurbsSurfaceObj.nurbsObj.position.y);
                 // s_point_temp_xy.y = -s_point_temp_xy.y;
+                console.log({...s_point_temp})
+                console.log({...s_point_temp_uv})
               }
               else {
                 uvSpace.s_point_temp = false;
@@ -1009,10 +1016,8 @@ class Simulator {
 
         // Restore this.pendingRays[j] to UV-space if it was there
         // if (opticalObjs[i].toEnabled){// && pendingRaysj_uv !== null) {
-        if (pendingRaysj_uv !== null) {
-          this.pendingRays[j] = pendingRaysj_uv;
-          s_point = s_point_uv;
-        }
+        if (pendingRaysj_uv !== null) this.pendingRays[j] = pendingRaysj_uv;
+        if (s_point_uv !== null) s_point = s_point_uv;
         console.log({...pendingRaysj_uv});
         console.log({...this.pendingRays[j]});
         console.log({...s_point});
